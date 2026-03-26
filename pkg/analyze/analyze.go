@@ -87,6 +87,8 @@ func Analyze(lex *lexdb.Lexicon, text string) Result {
 			} else {
 				negationScope = negationWindow
 			}
+			intensifyNext = false
+			downtonNext = false
 			tokens = append(tokens, t)
 			continue
 		}

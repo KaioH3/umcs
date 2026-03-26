@@ -2,6 +2,7 @@ package discover
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,10 @@ import (
 	"strings"
 	"time"
 )
+
+// ErrPageNotFound is returned by Fetch when Wiktionary has no entry for the word.
+// This is a permanent, non-recoverable error — the checkpoint should mark the key.
+var ErrPageNotFound = errors.New("page not found")
 
 // Entry holds data extracted from a Wiktionary page.
 type Entry struct {
@@ -131,6 +136,9 @@ func Fetch(word, lang string) (*Entry, error) {
 		return nil, fmt.Errorf("wiktionary parse %q: %w", word, err)
 	}
 	if parsed.Error.Code != "" {
+		if parsed.Error.Code == "missingtitle" {
+			return nil, fmt.Errorf("%w: %s", ErrPageNotFound, word)
+		}
 		return nil, fmt.Errorf("wiktionary: %s — %s", parsed.Error.Code, parsed.Error.Info)
 	}
 	wikitext := parsed.Parse.Wikitext.Star

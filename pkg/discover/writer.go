@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -30,8 +31,9 @@ func LoadCheckpoint(path string) (*Checkpoint, error) {
 		return nil, err
 	}
 	var cp Checkpoint
-	if json.Unmarshal(data, &cp) != nil {
-		return &Checkpoint{}, nil // corrupt checkpoint → start fresh
+	if err := json.Unmarshal(data, &cp); err != nil {
+		log.Printf("warning: checkpoint corrupt, starting fresh: %v", err)
+		return &Checkpoint{}, nil
 	}
 	return &cp, nil
 }

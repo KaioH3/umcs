@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -152,7 +153,11 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 				logf("  skip %q [%s]: %v", item.word, item.lang, err)
 			}
 			stats.Errors++
-			cp.Mark(fetchKey)
+			// Only mark as processed for permanent errors (missing page).
+			// Network/transient errors are not marked — next run will retry.
+			if errors.Is(err, ErrPageNotFound) {
+				cp.Mark(fetchKey)
+			}
 			continue
 		}
 

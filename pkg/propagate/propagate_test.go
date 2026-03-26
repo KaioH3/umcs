@@ -114,6 +114,62 @@ func TestPropagateMajorityVote(t *testing.T) {
 	}
 }
 
+// TestMajorityVoteDomainPreservation verifies the domain-loss bug fix:
+// cognates with FINANCIAL domain should produce consensus with FINANCIAL, not GENERAL.
+func TestMajorityVoteDomainPreservation(t *testing.T) {
+	finNegSent, _ := sentiment.Pack("NEGATIVE", "MODERATE", "EVALUATION", "FINANCIAL", nil)
+
+	roots := []seed.Root{
+		{RootID: 1, RootStr: "negat", Origin: "LATIN", MeaningEN: "deny"},
+	}
+	words := []seed.Word{
+		{WordID: 4097, RootID: 1, Variant: 1, Word: "negative", Lang: "EN", Norm: "negative", Sentiment: finNegSent},
+		{WordID: 4098, RootID: 1, Variant: 2, Word: "negativo", Lang: "PT", Norm: "negativo", Sentiment: finNegSent},
+		{WordID: 4099, RootID: 1, Variant: 3, Word: "negativo", Lang: "ES", Norm: "negativo", Sentiment: 0}, // unannotated
+	}
+	lex := buildPropLex(t, roots, words)
+
+	results := propagate.Run(lex)
+	if len(results) != 1 {
+		t.Fatalf("want 1 propagation result, got %d", len(results))
+	}
+
+	got := results[0].NewSent
+	gotDomain := sentiment.Domain(got)
+	if gotDomain != sentiment.Domain(finNegSent) {
+		t.Fatalf("domain should be preserved as FINANCIAL (0x%X), got 0x%X",
+			sentiment.Domain(finNegSent), gotDomain)
+	}
+	if sentiment.Polarity(got) != sentiment.PolarityNegative {
+		t.Fatalf("polarity should be NEGATIVE, got 0x%X", sentiment.Polarity(got))
+	}
+}
+
+func TestMajorityVotePolarity(t *testing.T) {
+	// 3 NEGATIVE + 1 POSITIVE → NEGATIVE wins (duplicates the vote-checking in TestPropagateMajorityVote
+	// but here we verify the exact polarity, not just "not positive")
+	roots := []seed.Root{
+		{RootID: 5, RootStr: "fort", Origin: "LATIN", MeaningEN: "strong"},
+	}
+	posSent, _ := sentiment.Pack("POSITIVE", "STRONG", "EVALUATION", "GENERAL", nil)
+	negSentLocal, _ := sentiment.Pack("NEGATIVE", "MODERATE", "EVALUATION", "GENERAL", nil)
+	words := []seed.Word{
+		{WordID: 20481, RootID: 5, Variant: 1, Word: "w1", Lang: "EN", Norm: "w1", Sentiment: negSentLocal},
+		{WordID: 20482, RootID: 5, Variant: 2, Word: "w2", Lang: "PT", Norm: "w2", Sentiment: negSentLocal},
+		{WordID: 20483, RootID: 5, Variant: 3, Word: "w3", Lang: "ES", Norm: "w3", Sentiment: negSentLocal},
+		{WordID: 20484, RootID: 5, Variant: 4, Word: "w4", Lang: "IT", Norm: "w4", Sentiment: posSent},
+		{WordID: 20485, RootID: 5, Variant: 5, Word: "w5", Lang: "DE", Norm: "w5", Sentiment: 0},
+	}
+	lex := buildPropLex(t, roots, words)
+	results := propagate.Run(lex)
+	if len(results) != 1 {
+		t.Fatalf("want 1 result, got %d", len(results))
+	}
+	if sentiment.Polarity(results[0].NewSent) != sentiment.PolarityNegative {
+		t.Fatalf("3 NEGATIVE vs 1 POSITIVE → NEGATIVE should win")
+	}
+}
+
 func TestPropagateEmptyLexicon(t *testing.T) {
 	lex := buildPropLex(t, nil, nil)
 	results := propagate.Run(lex)

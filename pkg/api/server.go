@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kak/lex-sentiment/pkg/analyze"
 	"github.com/kak/lex-sentiment/pkg/lexdb"
+	"github.com/kak/lex-sentiment/pkg/morpheme"
 	"github.com/kak/lex-sentiment/pkg/sentiment"
 	"github.com/kak/lex-sentiment/pkg/tokenizer"
 )
@@ -29,11 +33,14 @@ func New(lex *lexdb.Lexicon) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/stats", s.handleStats)
 	mux.HandleFunc("/lookup", s.handleLookup)
 	mux.HandleFunc("/cognates", s.handleCognates)
 	mux.HandleFunc("/etymo", s.handleEtymo)
 	mux.HandleFunc("/analyze", s.handleAnalyze)
+	mux.HandleFunc("/analyze/batch", s.handleAnalyzeBatch)
 	mux.HandleFunc("/tokenize", s.handleTokenize)
+	mux.HandleFunc("/vocab", s.handleVocab)
 	mux.HandleFunc("/roots", s.handleRoots)
 	mux.HandleFunc("/root/", s.handleRoot)
 	mux.HandleFunc("/sentiment/decode", s.handleSentimentDecode)
@@ -43,10 +50,21 @@ func (s *Server) Handler() http.Handler {
 // Listen starts the HTTP server on the given address.
 func (s *Server) Listen(addr string) error {
 	fmt.Printf("lexsent API listening on %s\n", addr)
-	return http.ListenAndServe(addr, s.Handler())
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      s.Handler(),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	jsonOK(w, map[string]any{
 		"status": "ok",
 		"roots":  s.lex.Stats.RootCount,
@@ -55,7 +73,38 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	byLang := make(map[string]int)
+	for _, w := range s.lex.Words {
+		lang := lexdb.LangName(w.Lang)
+		byLang[lang]++
+	}
+
+	avgCognates := 0.0
+	if s.lex.Stats.RootCount > 0 {
+		avgCognates = float64(s.lex.Stats.WordCount) / float64(s.lex.Stats.RootCount)
+	}
+
+	jsonOK(w, map[string]any{
+		"roots":                s.lex.Stats.RootCount,
+		"words":                s.lex.Stats.WordCount,
+		"heap_bytes":           s.lex.Stats.HeapSize,
+		"file_bytes":           s.lex.Stats.FileSize,
+		"by_lang":              byLang,
+		"avg_cognates_per_root": avgCognates,
+	})
+}
+
 func (s *Server) handleLookup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	word := r.URL.Query().Get("word")
 	if word == "" {
 		httpErr(w, "missing ?word=", 400)
@@ -100,6 +149,10 @@ func (s *Server) handleLookup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCognates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	word := r.URL.Query().Get("word")
 	if word == "" {
 		httpErr(w, "missing ?word=", 400)
@@ -133,6 +186,10 @@ func (s *Server) handleCognates(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEtymo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	word := r.URL.Query().Get("word")
 	if word == "" {
 		httpErr(w, "missing ?word=", 400)
@@ -157,6 +214,10 @@ func (s *Server) handleEtymo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	text, err := readBody(r)
 	if err != nil {
 		httpErr(w, "read body: "+err.Error(), 400)
@@ -201,6 +262,10 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTokenize(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	text, err := readBody(r)
 	if err != nil {
 		httpErr(w, "read body: "+err.Error(), 400)
@@ -240,6 +305,10 @@ func (s *Server) handleTokenize(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRoots(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	productive := r.URL.Query().Get("productive") == "true"
 
 	roots := make([]map[string]any, 0, len(s.lex.Roots))
@@ -263,43 +332,151 @@ func (s *Server) handleRoots(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if productive {
-		// Sort by productivity descending (simple insertion sort for small N)
-		for i := range roots {
-			for j := i + 1; j < len(roots); j++ {
-				if roots[j]["productivity"].(int) > roots[i]["productivity"].(int) {
-					roots[i], roots[j] = roots[j], roots[i]
-				}
-			}
-		}
+		sort.Slice(roots, func(i, j int) bool {
+			return roots[i]["productivity"].(int) > roots[j]["productivity"].(int)
+		})
 	}
 
 	jsonOK(w, map[string]any{"count": len(roots), "roots": roots})
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/root/")
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Route: /root/{id} or /root/{id}/words
+	path := strings.TrimPrefix(r.URL.Path, "/root/")
+	parts := strings.SplitN(path, "/", 2)
+	id, err := strconv.ParseUint(parts[0], 10, 32)
 	if err != nil {
-		httpErr(w, "invalid root id", 400)
+		httpErr(w, "invalid root id", http.StatusBadRequest)
 		return
 	}
 	root := s.lex.LookupRoot(uint32(id))
 	if root == nil {
-		httpErr(w, fmt.Sprintf("root_id %d not found", id), 404)
+		httpErr(w, fmt.Sprintf("root_id %d not found", id), http.StatusNotFound)
 		return
 	}
+
+	// /root/{id}/words — morphological family grouped by language
+	if len(parts) == 2 && parts[1] == "words" {
+		cognates := s.lex.Cognates(root.FirstWordIdx) // FirstWordIdx is used as ref
+		// Use the first actual word_id for cognate lookup
+		if int(root.FirstWordIdx) < len(s.lex.Words) {
+			cognates = s.lex.Cognates(s.lex.Words[root.FirstWordIdx].WordID)
+		}
+		byLang := make(map[string][]map[string]any)
+		for _, c := range cognates {
+			lang := lexdb.LangName(c.Lang)
+			sent := sentiment.Decode(c.Sentiment)
+			byLang[lang] = append(byLang[lang], map[string]any{
+				"word":    s.lex.WordStr(&c),
+				"word_id": c.WordID,
+				"polarity": sent["polarity"],
+				"intensity": sent["intensity"],
+			})
+		}
+		jsonOK(w, map[string]any{
+			"root_id": root.RootID,
+			"root":    s.lex.RootStr(root),
+			"origin":  s.lex.RootOrigin(root),
+			"meaning": s.lex.RootMeaning(root),
+			"words":   byLang,
+		})
+		return
+	}
+
 	jsonOK(w, map[string]any{
-		"root_id":       root.RootID,
-		"root":          s.lex.RootStr(root),
-		"origin":        s.lex.RootOrigin(root),
-		"meaning":       s.lex.RootMeaning(root),
-		"word_count":    root.WordCount,
-		"lang_coverage": strings.Join(s.lex.LangCoverage(root.LangCoverage), ","),
+		"root_id":        root.RootID,
+		"root":           s.lex.RootStr(root),
+		"origin":         s.lex.RootOrigin(root),
+		"meaning":        s.lex.RootMeaning(root),
+		"word_count":     root.WordCount,
+		"lang_coverage":  strings.Join(s.lex.LangCoverage(root.LangCoverage), ","),
 		"parent_root_id": root.ParentRootID,
 	})
 }
 
+// handleAnalyzeBatch processes up to 100 texts in a single request.
+func (s *Server) handleAnalyzeBatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var items []struct {
+		Text string `json:"text"`
+		Lang string `json:"lang"`
+	}
+	if err := json.Unmarshal(body, &items); err != nil {
+		httpErr(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(items) > 100 {
+		httpErr(w, "batch limit is 100 items", http.StatusBadRequest)
+		return
+	}
+
+	results := make([]map[string]any, len(items))
+	for i, item := range items {
+		result := analyze.Analyze(s.lex, item.Text)
+		results[i] = map[string]any{
+			"text":    item.Text,
+			"verdict": result.Verdict,
+			"score":   result.TotalScore,
+			"matched": result.Matched,
+			"total":   result.Total,
+		}
+	}
+	jsonOK(w, results)
+}
+
+// handleVocab exports the vocabulary in a HuggingFace-compatible tokenizer format.
+func (s *Server) handleVocab(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	vocab := make(map[string]uint32, len(s.lex.Words))
+	rootMap := make(map[uint32]uint32, len(s.lex.Words))
+	var maxRootID uint32
+	for _, wr := range s.lex.Words {
+		word := s.lex.WordStr(&wr)
+		if word != "" {
+			vocab[word] = wr.WordID
+			rootMap[wr.WordID] = morpheme.RootOf(wr.WordID)
+		}
+		if morpheme.RootOf(wr.WordID) > maxRootID {
+			maxRootID = morpheme.RootOf(wr.WordID)
+		}
+	}
+
+	jsonOK(w, map[string]any{
+		"version": "1.0",
+		"model": map[string]any{
+			"type":        "morpheme",
+			"max_root_id": maxRootID,
+			"vocab_size":  len(vocab),
+		},
+		"vocab":    vocab,
+		"root_map": rootMap,
+	})
+}
+
 func (s *Server) handleSentimentDecode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	sStr := r.URL.Query().Get("s")
 	if sStr == "" {
 		httpErr(w, "missing ?s=", 400)
@@ -321,13 +498,17 @@ func (s *Server) handleSentimentDecode(w http.ResponseWriter, r *http.Request) {
 
 func jsonOK(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("jsonOK encode error: %v", err)
+	}
 }
 
 func httpErr(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		log.Printf("httpErr encode error: %v", err)
+	}
 }
 
 func readBody(r *http.Request) (string, error) {

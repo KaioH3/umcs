@@ -7,6 +7,7 @@ package propagate
 
 import (
 	"github.com/kak/lex-sentiment/pkg/lexdb"
+	"github.com/kak/lex-sentiment/pkg/morpheme"
 	"github.com/kak/lex-sentiment/pkg/sentiment"
 )
 
@@ -32,7 +33,7 @@ func Run(lex *lexdb.Lexicon) []Result {
 		if root.WordCount == 0 {
 			continue
 		}
-		sampleID := root.RootID<<12 | 1
+		sampleID, _ := morpheme.MakeWordID(root.RootID, 1)
 		cognates := lex.Cognates(sampleID)
 		if len(cognates) == 0 {
 			// Try with FirstWordIdx
@@ -84,7 +85,7 @@ func Run(lex *lexdb.Lexicon) []Result {
 func majorityVote(sentiments []uint32) uint32 {
 	counts := make(map[uint32]int)
 	for _, s := range sentiments {
-		key := (s & sentiment.PolarityMask) | (s & sentiment.IntensityMask) | (s & sentiment.RoleMask)
+		key := (s & sentiment.PolarityMask) | (s & sentiment.IntensityMask) | (s & sentiment.RoleMask) | (s & sentiment.DomainMask)
 		counts[key]++
 	}
 	var best uint32
@@ -95,5 +96,5 @@ func majorityVote(sentiments []uint32) uint32 {
 			best = k
 		}
 	}
-	return best | sentiment.DomainGeneral
+	return best
 }

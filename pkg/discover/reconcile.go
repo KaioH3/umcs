@@ -9,10 +9,10 @@ import (
 // rootStemSuffixes are common Latin/PIE endings removed to find the stem.
 // Ordered from longest to shortest to avoid prefix clashes.
 var rootStemSuffixes = []string{
-	"ation", "ation", "ment", "ness", "ness",
-	"are", "ere", "ire",  // Latin verb infinitives
-	"alis", "ilis", "alis",
-	"us", "um", "a", "is", "os",
+	"ation", "ment", "ness",      // 4–6 chars: derivational suffixes
+	"alis", "ilis",               // 4–5 chars: Latin adjective endings
+	"are", "ere", "ire",          // 3 chars: Latin verb infinitives
+	"us", "um", "is", "os", "a", // 1–2 chars: Latin declension endings (longest first)
 }
 
 // StemAncestor reduces a Latin/PIE ancestor word to its likely root morpheme.

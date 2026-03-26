@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/kak/lex-sentiment/pkg/morpheme"
 )
 
 // Lexicon holds the fully loaded lexicon in memory.
@@ -242,7 +244,7 @@ func (l *Lexicon) LookupRoot(rootID uint32) *RootRecord {
 // Cognates returns all word records sharing the same root_id as the given word.
 // Words are sorted by word_id in the binary, so cognates are contiguous.
 func (l *Lexicon) Cognates(wordID uint32) []WordRecord {
-	rootID := wordID >> 12
+	rootID := morpheme.RootOf(wordID)
 	root := l.LookupRoot(rootID)
 	if root == nil {
 		return nil

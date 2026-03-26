@@ -323,6 +323,141 @@ func TestRootByIDInvalid(t *testing.T) {
 	}
 }
 
+// TestMethodValidation verifies that GET-only endpoints reject non-GET methods.
+func TestMethodValidation(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+
+	cases := []struct {
+		name   string
+		method string
+		url    string
+	}{
+		{"health POST", "POST", "/health"},
+		{"health DELETE", "DELETE", "/health"},
+		{"lookup POST", "POST", "/lookup?word=negative"},
+		{"cognates DELETE", "DELETE", "/cognates?word=negative"},
+		{"roots PUT", "PUT", "/roots"},
+		{"root PUT", "PUT", "/root/1"},
+		{"sentiment/decode POST", "POST", "/sentiment/decode?s=64"},
+		{"stats DELETE", "DELETE", "/stats"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doRequest(h, tc.method, tc.url, "")
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Fatalf("%s %s: want 405, got %d", tc.method, tc.url, rec.Code)
+			}
+		})
+	}
+}
+
+// TestAnalyzeBatch verifies the batch endpoint accepts up to 100 items.
+func TestAnalyzeBatch(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+
+	body := `[{"text":"not terrible","lang":"EN"},{"text":"good","lang":"EN"}]`
+	rec := doRequest(h, "POST", "/analyze/batch", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("want 200, got %d (body=%s)", rec.Code, rec.Body.String())
+	}
+
+	var results []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &results); err != nil {
+		t.Fatalf("decode JSON: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("want 2 results, got %d", len(results))
+	}
+	for _, r := range results {
+		if _, ok := r["verdict"]; !ok {
+			t.Fatal("each result must have a verdict field")
+		}
+	}
+}
+
+func TestAnalyzeBatchMethodNotAllowed(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "GET", "/analyze/batch", "")
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("want 405, got %d", rec.Code)
+	}
+}
+
+func TestAnalyzeBatchLimitExceeded(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	// Build a JSON array with 101 items
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i := range 101 {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(`{"text":"test","lang":"EN"}`)
+	}
+	sb.WriteString("]")
+	rec := doRequest(h, "POST", "/analyze/batch", sb.String())
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("want 400 for batch > 100, got %d", rec.Code)
+	}
+}
+
+func TestVocabEndpoint(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "GET", "/vocab?format=json", "")
+
+	if rec.Code != 200 {
+		t.Fatalf("want 200, got %d (body=%s)", rec.Code, rec.Body.String())
+	}
+	body := decodeJSON(t, rec)
+	if _, ok := body["vocab"]; !ok {
+		t.Fatal("response must include vocab field")
+	}
+	if _, ok := body["root_map"]; !ok {
+		t.Fatal("response must include root_map field")
+	}
+	model, ok := body["model"].(map[string]any)
+	if !ok {
+		t.Fatal("response must include model field")
+	}
+	if model["type"] != "morpheme" {
+		t.Fatalf("model.type should be 'morpheme', got %v", model["type"])
+	}
+}
+
+func TestStatsEndpoint(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "GET", "/stats", "")
+
+	if rec.Code != 200 {
+		t.Fatalf("want 200, got %d (body=%s)", rec.Code, rec.Body.String())
+	}
+	body := decodeJSON(t, rec)
+	if _, ok := body["roots"]; !ok {
+		t.Fatal("stats must include roots field")
+	}
+	if _, ok := body["by_lang"]; !ok {
+		t.Fatal("stats must include by_lang field")
+	}
+}
+
+func TestRootWords(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "GET", "/root/1/words", "")
+
+	if rec.Code != 200 {
+		t.Fatalf("want 200, got %d (body=%s)", rec.Code, rec.Body.String())
+	}
+	body := decodeJSON(t, rec)
+	if _, ok := body["words"]; !ok {
+		t.Fatal("response must include words field")
+	}
+	if body["root_id"].(float64) != 1 {
+		t.Fatalf("want root_id=1, got %v", body["root_id"])
+	}
+}
+
 func TestEtymoEndpoint(t *testing.T) {
 	h := api.New(buildAPILex(t)).Handler()
 	rec := doRequest(h, "GET", "/etymo?word=negative", "")

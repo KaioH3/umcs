@@ -18,11 +18,13 @@ func buildTestLex(t *testing.T) *lexdb.Lexicon {
 	goodSent, _ := sentiment.Pack("POSITIVE", "MODERATE", "EVALUATION", "GENERAL", nil)
 	notSent, _ := sentiment.Pack("NEUTRAL", "NONE", "NEGATION_MARKER", "GENERAL", []string{"NEGATION_MARKER"})
 	verySent, _ := sentiment.Pack("NEUTRAL", "NONE", "INTENSIFIER", "GENERAL", []string{"INTENSIFIER"})
+	slightlySent, _ := sentiment.Pack("NEUTRAL", "NONE", "DOWNTONER", "GENERAL", []string{"DOWNTONER"})
 
 	roots := []seed.Root{
 		{RootID: 1, RootStr: "negat", Origin: "LATIN", MeaningEN: "deny"},
 		{RootID: 2, RootStr: "bon", Origin: "LATIN", MeaningEN: "good"},
 		{RootID: 10, RootStr: "terr", Origin: "LATIN", MeaningEN: "fear"},
+		{RootID: 55, RootStr: "lent", Origin: "LATIN", MeaningEN: "slow"},
 		{RootID: 61, RootStr: "ne", Origin: "PIE", MeaningEN: "negation"},
 		{RootID: 62, RootStr: "vald", Origin: "PGmc", MeaningEN: "very"},
 	}
@@ -30,6 +32,7 @@ func buildTestLex(t *testing.T) *lexdb.Lexicon {
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "negative", Lang: "EN", Norm: "negative", Sentiment: 0x00120180},
 		{WordID: 8193, RootID: 2, Variant: 1, Word: "good", Lang: "EN", Norm: "good", Sentiment: goodSent},
 		{WordID: 40961, RootID: 10, Variant: 1, Word: "terrible", Lang: "EN", Norm: "terrible", Sentiment: terrSent},
+		{WordID: 225281, RootID: 55, Variant: 1, Word: "slightly", Lang: "EN", Norm: "slightly", Sentiment: slightlySent},
 		{WordID: 249857, RootID: 61, Variant: 1, Word: "not", Lang: "EN", Norm: "not", Sentiment: notSent},
 		{WordID: 253953, RootID: 62, Variant: 1, Word: "very", Lang: "EN", Norm: "very", Sentiment: verySent},
 	}
@@ -106,6 +109,47 @@ func TestPunctuationStrip(t *testing.T) {
 	r2 := analyze.Analyze(lex, "terrible!")
 	if r1.TotalScore != r2.TotalScore {
 		t.Fatalf("punctuation should be stripped: %d vs %d", r1.TotalScore, r2.TotalScore)
+	}
+}
+
+// TestIntensifierThenNegation verifies the intensifier carryover fix:
+// "very not terrible" — "very" should NOT amplify "terrible" because "not"
+// clears intensifyNext before "terrible" is processed.
+func TestIntensifierThenNegation(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "very not terrible")
+	// "not" clears intensifyNext → "terrible" is negated but NOT amplified.
+	// Negated STRONG (3) → weight = +3, not +6.
+	if r.TotalScore != 3 {
+		t.Fatalf("'very not terrible': want score=3 (negated, not amplified), got %d", r.TotalScore)
+	}
+	// Verify the token-level state
+	found := false
+	for _, tok := range r.Tokens {
+		if tok.Surface == "terrible" {
+			if tok.Amplified {
+				t.Fatal("'terrible' should NOT be amplified after 'very not'")
+			}
+			if !tok.Negated {
+				t.Fatal("'terrible' should be negated")
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("'terrible' token not found in result")
+	}
+}
+
+// TestDowntonerThenNegation verifies that a downtoner before "not" does not
+// carry over to affect the word after "not".
+func TestDowntonerThenNegation(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "slightly not good")
+	// "not" clears downtonNext → "good" is negated but NOT downtoned.
+	// Negated MODERATE (2) → weight = -2, not -1.
+	if r.TotalScore != -2 {
+		t.Fatalf("'slightly not good': want score=-2 (negated, not downtoned), got %d", r.TotalScore)
 	}
 }
 
