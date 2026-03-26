@@ -1,0 +1,82 @@
+root_id,root_str,origin,meaning_en,notes,parent_root_id
+1,negat,LATIN,to deny or negate,from negare (to deny),0
+2,affirm,LATIN,to affirm or confirm,from affirmare,0
+3,bon,LATIN,good,from bonus (good),0
+4,mal,LATIN,bad or evil,from malus (bad),0
+5,fort,LATIN,strong or powerful,from fortis (strong),0
+6,liber,LATIN,free,from liber (free),0
+7,am,LATIN,to love,from amare (to love),0
+8,trist,LATIN,sad,from tristis (sad),0
+9,grat,LATIN,grateful or pleasant,from gratus (grateful),0
+10,terr,LATIN,fear or dread,from terror,0
+11,viol,LATIN,violence or force,from violentus,0
+12,pac,LATIN,peace,from pax/pacis,0
+13,just,LATIN,just or right,from justus,0
+14,sol,LATIN,alone or sole,from solus,0
+15,greg,LATIN,group or flock,from grex/gregis,0
+16,aud,LATIN,to hear or dare,from audire,0
+17,vid,LATIN,to see,from videre,0
+18,scrib,LATIN,to write,from scribere,0
+19,dict,LATIN,to say or declare,from dicere,0
+20,duc,LATIN,to lead,from ducere,0
+21,fac,LATIN,to make or do,from facere,0
+22,port,LATIN,to carry,from portare,0
+23,mit,LATIN,to send,from mittere,0
+24,pon,LATIN,to place or put,from ponere,0
+25,ten,LATIN,to hold,from tenere,0
+26,ven,LATIN,to come,from venire,0
+27,vers,LATIN,to turn,from vertere,0
+28,voc,LATIN,to call or voice,from vocare,0
+29,cap,LATIN,to take or seize,from capere,0
+30,cred,LATIN,to believe or trust,from credere,0
+31,excel,LATIN,to surpass or excel,from excellere,0
+32,terrib,LATIN,terrible or causing terror,derived from terrere,10
+33,horr,LATIN,horror or dread,from horrere,0
+34,bel,LATIN,beautiful,from bellus,0
+35,felic,LATIN,happy or fortunate,from felix/felicis,0
+36,serv,LATIN,to serve or preserve,from servire,0
+37,ir,LATIN,anger or wrath,from ira (anger),0
+38,dolor,LATIN,pain or grief,from dolor,0
+39,sper,LATIN,hope,from sperare,0
+40,tim,LATIN,fear,from timere,0
+41,cur,LATIN,to take care or run,from cura/currere,0
+42,nov,LATIN,new,from novus,0
+43,vit,LATIN,life,from vita,0
+44,mort,LATIN,death,from mors/mortis,0
+45,laud,LATIN,praise,from laudare,0
+46,culp,LATIN,fault or blame,from culpa,0
+47,litig,LATIN,dispute or litigation,from litigare,13
+48,fid,LATIN,faith or trust,from fides,30
+49,clar,LATIN,clear or bright,from clarus,0
+50,magn,LATIN,great or large,from magnus,0
+51,parv,LATIN,small,from parvus,0
+52,plen,LATIN,full,from plenus,0
+53,vac,LATIN,empty,from vacuus,0
+54,rapid,LATIN,fast,from rapidus,0
+55,lent,LATIN,slow,from lentus,0
+56,gut,PROTO_GERMANIC,good,Proto-Germanic gutaz → EN good / DE gut,0
+57,libh,PROTO_GERMANIC,love,Proto-Germanic lubją → EN love / DE Liebe,0
+58,heil,PROTO_GERMANIC,holy or whole,Proto-Germanic hailagaz → EN holy / DE heilig,0
+59,ang,PROTO_GERMANIC,narrow or painful,Proto-Germanic *angaz → EN anguish / DE eng,0
+60,stark,PROTO_GERMANIC,strong or rigid,Proto-Germanic starkaz → EN stark / DE stark,0
+61,ne,PROTO_INDO_EUROPEAN,negation particle,PIE *ne → not/não/no/nicht/non/non,0
+62,vald,PROTO_GERMANIC,very or powerful,PIE *wal → very/sehr/muy/molto,0
+63,et,LATIN,and or connector,from et/et → and/e/y/und,0
+64,cond,PROTO_INDO_EUROPEAN,conditional connector,PIE *ḱe → if/se/si/wenn — marks hypothetical clauses,0
+65,caus,LATIN,causal connector,from causa → because/porque/weil — marks reason clauses,0
+66,conc,LATIN,concessive connector,from concedere → although/embora/obwohl — marks contrast,0
+67,cons,LATIN,consecutive connector,from consequi → therefore/portanto/also/donc — marks consequence,0
+68,temp,LATIN,temporal connector,from tempus → when/quando/wenn/quand — marks time clauses,0
+69,vel,LATIN,to want or wish,from velle → want/querer/wollen/vouloir — volitional verbs,0
+70,cert,LATIN,certain or sure,from certus → certain/certo/sicher/sure — epistemic markers,0
+71,optim,LATIN,optimal or best,from optimus → ótimo/optimal/best — positive superlative scale,0
+72,pess,LATIN,worst or pessimal,from pessimus → péssimo/worst/pésimo — negative extreme scale,0
+73,dub,LATIN,doubt or uncertain,from dubius → doubt/dúvida/duda — epistemic uncertainty,0
+74,愛,CHINESE,love or affection,CJK ideogram 愛 — shared in ZH/JA(ai)/KO(ae) — same root as amor,7
+75,悲,CHINESE,sorrow or grief,CJK ideogram 悲 — shared in ZH/JA(hi)/KO(bi) — same root as tristis,8
+76,喜,CHINESE,joy or happiness,CJK ideogram 喜 — shared in ZH/JA(ki)/KO(hui) — same root as felix,35
+77,怒,CHINESE,anger or rage,CJK ideogram 怒 — shared in ZH/JA(do)/KO(no) — same root as ira,37
+78,美,CHINESE,beauty or beautiful,CJK ideogram 美 — shared in ZH/JA(bi)/KO(mi) — same root as bellus,34
+79,善,CHINESE,good or virtuous,CJK ideogram 善 — shared in ZH/JA(zen)/KO(seon) — same root as bonus,3
+80,悪,CHINESE,evil or bad,CJK ideogram 悪 — shared in ZH/JA(aku)/KO(ak) — same root as malus,4
+81,希望,CHINESE,hope or wish,CJK compound 希(rare)+望(hope/desire) — shared ZH/JA(kibou) — same root as sperare,39
