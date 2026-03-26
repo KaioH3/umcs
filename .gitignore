@@ -1,5 +1,5 @@
 /lexsent
-*.lsdb
+*.umcs
 dumps/
 data/.discover_checkpoint.json
 data/staged.csv

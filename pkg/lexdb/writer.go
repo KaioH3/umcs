@@ -10,7 +10,7 @@ import (
 	"github.com/kak/umcs/pkg/seed"
 )
 
-// Build reads seed roots and words, validates them, and writes a .lsdb binary file.
+// Build reads seed roots and words, validates them, and writes a .umcs binary file.
 func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, error) {
 	if err := validate(roots, words); err != nil {
 		return nil, err

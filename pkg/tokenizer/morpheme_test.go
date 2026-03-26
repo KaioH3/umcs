@@ -24,11 +24,11 @@ func buildTokenLex(t *testing.T) *lexdb.Lexicon {
 		{WordID: 8194, RootID: 2, Variant: 2, Word: "good", Lang: "EN", Norm: "good", Sentiment: 0x00130140},
 	}
 
-	_, err := lexdb.Build(roots, words, filepath.Join(dir, "tok.lsdb"))
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "tok.umcs"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	lex, err := lexdb.Load(filepath.Join(dir, "tok.lsdb"))
+	lex, err := lexdb.Load(filepath.Join(dir, "tok.umcs"))
 	if err != nil {
 		t.Fatal(err)
 	}

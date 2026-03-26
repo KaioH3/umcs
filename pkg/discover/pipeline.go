@@ -41,6 +41,16 @@ type Stats struct {
 // confidenceThreshold is the minimum confidence to auto-accept a word.
 const confidenceThreshold = 0.60
 
+// blockedRoots are root IDs whose translations must not be auto-accepted.
+// These are taboo/vulgar/profanity roots: their Wiktionary translations
+// often include polysemous words that have primary meanings in other domains
+// (e.g. PT "comer"=eat has a vulgar sense, but is not a vulgar word).
+var blockedRoots = map[uint32]bool{
+	84: true, // fod  — sexual vulgar
+	85: true, // merd — excrement vulgar
+	86: true, // fod intensifier
+}
+
 // bfsItem is one element of the BFS work queue.
 type bfsItem struct {
 	word  string
@@ -305,7 +315,14 @@ func isValidWord(word string) bool {
 
 // classifyBest picks the highest-confidence score from all available classifiers.
 // entry may be nil when classifying a translation (only propagation is used then).
+// Words for blocked (taboo/vulgar) roots always return zero confidence so they
+// land in staged.csv for manual review.
 func classifyBest(rootID uint32, entry *Entry, allWords []seed.Word) Score {
+	if blockedRoots[rootID] {
+		return Score{Polarity: "NEUTRAL", Intensity: "NONE", Role: "EVALUATION",
+			Confidence: 0, Source: "blocked-root"}
+	}
+
 	propScore := ScoreViaPropagation(rootID, allWords)
 
 	if entry == nil {

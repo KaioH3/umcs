@@ -55,7 +55,7 @@ func TestWrongVersion(t *testing.T) {
 }
 
 func TestEmptyFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "empty.lsdb")
+	path := filepath.Join(t.TempDir(), "empty.umcs")
 	os.WriteFile(path, []byte{}, 0644)
 	_, err := lexdb.Load(path)
 	if err == nil {
@@ -64,7 +64,7 @@ func TestEmptyFile(t *testing.T) {
 }
 
 func TestAllZeros(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "zeros.lsdb")
+	path := filepath.Join(t.TempDir(), "zeros.umcs")
 	os.WriteFile(path, bytes.Repeat([]byte{0}, 1024), 0644)
 	_, err := lexdb.Load(path)
 	if err == nil {
@@ -73,7 +73,7 @@ func TestAllZeros(t *testing.T) {
 }
 
 func TestNonexistentFile(t *testing.T) {
-	_, err := lexdb.Load("/tmp/doesnotexist_lexsent_test_12345.lsdb")
+	_, err := lexdb.Load("/tmp/doesnotexist_lexsent_test_12345.umcs")
 	if err == nil {
 		t.Fatal("loading nonexistent file should fail")
 	}
@@ -143,7 +143,7 @@ func TestOverflowRootID(t *testing.T) {
 // --- Build edge cases ---
 
 func TestBuildNoRoots(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "empty.lsdb")
+	path := filepath.Join(t.TempDir(), "empty.umcs")
 	stats, err := lexdb.Build(nil, nil, path)
 	if err != nil {
 		t.Fatal(err)
@@ -168,7 +168,7 @@ func TestBuildDuplicateWordID(t *testing.T) {
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "negative", Lang: "EN", Norm: "negative"},
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "negative", Lang: "EN", Norm: "negative"}, // exact duplicate
 	}
-	path := filepath.Join(t.TempDir(), "dup.lsdb")
+	path := filepath.Join(t.TempDir(), "dup.umcs")
 	_, err := lexdb.Build(roots, words, path)
 	// Should not crash; may or may not error depending on policy
 	_ = err
@@ -182,7 +182,7 @@ func TestBuildRootWithNoWords(t *testing.T) {
 	words := []seed.Word{
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "negative", Lang: "EN", Norm: "negative"},
 	}
-	path := filepath.Join(t.TempDir(), "nowords.lsdb")
+	path := filepath.Join(t.TempDir(), "nowords.umcs")
 	stats, err := lexdb.Build(roots, words, path)
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +207,7 @@ func TestBuildEtymologyCycle(t *testing.T) {
 		{RootID: 1, RootStr: "a", Origin: "TEST", MeaningEN: "a", ParentRootID: 2},
 		{RootID: 2, RootStr: "b", Origin: "TEST", MeaningEN: "b", ParentRootID: 1},
 	}
-	path := filepath.Join(t.TempDir(), "cycle.lsdb")
+	path := filepath.Join(t.TempDir(), "cycle.umcs")
 	_, err := lexdb.Build(roots, nil, path)
 	if err != nil {
 		t.Fatal("builder accepts cycles (reader's EtymologyChain has cycle guard)")

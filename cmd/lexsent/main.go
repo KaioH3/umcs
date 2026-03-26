@@ -33,7 +33,7 @@ import (
 	"github.com/kak/umcs/pkg/tokenizer"
 )
 
-const defaultLexicon = "lexicon.lsdb"
+const defaultLexicon = "lexicon.umcs"
 
 func main() {
 	if len(os.Args) < 2 {

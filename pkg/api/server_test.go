@@ -35,11 +35,11 @@ func buildAPILex(t *testing.T) *lexdb.Lexicon {
 		{WordID: 249857, RootID: 61, Variant: 1, Word: "not", Lang: "EN", Norm: "not", Sentiment: notSent},
 	}
 
-	_, err := lexdb.Build(roots, words, filepath.Join(dir, "api_test.lsdb"))
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "api_test.umcs"))
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	lex, err := lexdb.Load(filepath.Join(dir, "api_test.lsdb"))
+	lex, err := lexdb.Load(filepath.Join(dir, "api_test.umcs"))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

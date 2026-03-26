@@ -1,4 +1,4 @@
-// Package lexdb defines the .lsdb binary format and provides reader/writer.
+// Package lexdb defines the .umcs binary format and provides reader/writer.
 //
 // File layout:
 //   [0..63]   Header (64 bytes)

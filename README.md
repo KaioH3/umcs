@@ -158,7 +158,7 @@ The binary format reserves 32 language slots — 8 remain free for future additi
 | Word entries | 1,396 |
 | Languages | 24 |
 | Theoretical capacity | ~1M roots × 4K variants = **4 billion word_ids** |
-| Binary size (lexicon.lsdb) | ~0.2 MB |
+| Binary size (lexicon.umcs) | ~0.2 MB |
 
 ---
 
@@ -171,7 +171,7 @@ cd umcs
 go build -o lexsent ./cmd/lexsent
 
 # Build the binary lexicon from CSV data
-./lexsent build --roots data/roots.csv --words data/words.csv --out lexicon.lsdb
+./lexsent build --roots data/roots.csv --words data/words.csv --out lexicon.umcs
 ```
 
 ---
@@ -252,7 +252,7 @@ curl "localhost:8080/roots?limit=10&offset=0&productive=true"
 
 | Command | Description |
 |---------|-------------|
-| `build` | Compile roots.csv + words.csv → binary .lsdb |
+| `build` | Compile roots.csv + words.csv → binary .umcs |
 | `lookup <word>` | Word lookup with cognates and etymology |
 | `cognates <word>` | Full morphological family across languages |
 | `etymo <word>` | Etymology chain to proto-language |
@@ -371,7 +371,7 @@ Examples:
   Morpheme.RootOf(4098) == Morpheme.RootOf(4097) → true (same family)
 ```
 
-### .lsdb binary format
+### .umcs binary format
 
 ```
 Offset  Size  Field

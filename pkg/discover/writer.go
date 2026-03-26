@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/kak/umcs/pkg/infer"
 	"github.com/kak/umcs/pkg/morpheme"
 	"github.com/kak/umcs/pkg/seed"
 	"github.com/kak/umcs/pkg/sentiment"
@@ -93,6 +94,9 @@ func appendRoots(roots []seed.Root, path string) error {
 			r.MeaningEN,
 			r.Notes,
 			fmt.Sprintf("%d", r.ParentRootID),
+			"", // hypernym_root_id — set manually after review
+			"", // antonym_root_id  — set manually after review
+			"", // synonym_root_id  — set manually after review
 		}); err != nil {
 			return err
 		}
@@ -117,6 +121,8 @@ func appendWords(words []seed.Word, path string) error {
 		if role == "" {
 			role = "EVALUATION"
 		}
+		// Infer phonology into flags so the next build picks up syllables/stress.
+		flags := infer.FillPhonology(word.Flags, word.Word, word.Lang)
 		if err := w.Write([]string{
 			fmt.Sprintf("%d", word.WordID),
 			fmt.Sprintf("%d", word.RootID),
@@ -129,7 +135,21 @@ func appendWords(words []seed.Word, path string) error {
 			role,
 			d["domain"],
 			fmt.Sprintf("%d", word.FreqRank),
-			fmt.Sprintf("%d", word.Flags),
+			fmt.Sprintf("%d", flags),
+			"", // pos          — inferred by infer.FillMissing on next build
+			"", // arousal
+			"", // dominance
+			"", // aoa
+			"", // concreteness
+			"", // register
+			"", // ontological
+			"", // polysemy
+			word.Pron,
+			"", // syllables  — packed into flags above
+			"", // stress     — packed into flags above
+			"", // valency
+			"", // irony_capable
+			"", // neologism
 		}); err != nil {
 			return err
 		}

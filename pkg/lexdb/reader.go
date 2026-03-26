@@ -31,7 +31,7 @@ type LexiconStats struct {
 	Checksum  uint32
 }
 
-// Load reads a .lsdb file into memory and builds the lookup index.
+// Load reads a .umcs file into memory and builds the lookup index.
 // The entire file is read at once; for very large lexicons (>100MB) use LoadMmap.
 func Load(path string) (*Lexicon, error) {
 	f, err := os.Open(path)
@@ -231,7 +231,7 @@ func (l *Lexicon) str(offset uint32) string {
 // each their own morpheme and must never be collapsed.
 //
 // This function is used by LookupWord and by the Build pipeline, so changing
-// it changes the norm stored in .lsdb files — rebuild required after any change.
+// it changes the norm stored in .umcs files — rebuild required after any change.
 func Normalize(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(strings.TrimSpace(s)) {

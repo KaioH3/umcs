@@ -37,11 +37,11 @@ func buildTestLex(t *testing.T) *lexdb.Lexicon {
 		{WordID: 253953, RootID: 62, Variant: 1, Word: "very", Lang: "EN", Norm: "very", Sentiment: verySent},
 	}
 
-	_, err := lexdb.Build(roots, words, filepath.Join(dir, "test.lsdb"))
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "test.umcs"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	lex, err := lexdb.Load(filepath.Join(dir, "test.lsdb"))
+	lex, err := lexdb.Load(filepath.Join(dir, "test.umcs"))
 	if err != nil {
 		t.Fatal(err)
 	}

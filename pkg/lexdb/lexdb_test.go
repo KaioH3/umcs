@@ -12,7 +12,7 @@ import (
 func buildTestLexicon(t *testing.T) (*lexdb.Lexicon, string) {
 	t.Helper()
 	dir := t.TempDir()
-	outPath := filepath.Join(dir, "test.lsdb")
+	outPath := filepath.Join(dir, "test.umcs")
 
 	roots := []seed.Root{
 		{RootID: 1, RootStr: "negat", Origin: "LATIN", MeaningEN: "to deny"},
@@ -212,7 +212,7 @@ func TestBuildRejectsDuplicateWordID(t *testing.T) {
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "negative", Lang: "EN", Norm: "negative"},
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "negativ", Lang: "DE", Norm: "negativ"}, // same word_id!
 	}
-	_, err := lexdb.Build(roots, words, filepath.Join(dir, "dup_id.lsdb"))
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "dup_id.umcs"))
 	if err == nil {
 		t.Fatal("duplicate word_id must be rejected by Build()")
 	}
@@ -227,7 +227,7 @@ func TestBuildRejectsDuplicateNormLang(t *testing.T) {
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "cafe", Lang: "PT", Norm: "cafe"},
 		{WordID: 4098, RootID: 1, Variant: 2, Word: "café", Lang: "PT", Norm: "cafe"}, // same norm + lang!
 	}
-	_, err := lexdb.Build(roots, words, filepath.Join(dir, "dup_norm.lsdb"))
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "dup_norm.umcs"))
 	if err == nil {
 		t.Fatal("duplicate (norm, lang) pair must be rejected by Build()")
 	}
@@ -247,11 +247,11 @@ func TestLookupWordInLang(t *testing.T) {
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "mais", Lang: "PT", Norm: "mais", Sentiment: 0x00120180},
 		{WordID: 8193, RootID: 2, Variant: 1, Word: "maïs", Lang: "FR", Norm: "mais", Sentiment: 0x00130140},
 	}
-	_, err := lexdb.Build(roots, words, filepath.Join(dir, "lang.lsdb"))
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "lang.umcs"))
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	lex, err := lexdb.Load(filepath.Join(dir, "lang.lsdb"))
+	lex, err := lexdb.Load(filepath.Join(dir, "lang.umcs"))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestValidationErrors(t *testing.T) {
 		{RootID: 1, RootStr: "negat", Origin: "LATIN", MeaningEN: "deny"},
 		{RootID: 1, RootStr: "duplicate", Origin: "LATIN", MeaningEN: "dup"},
 	}
-	_, err := lexdb.Build(roots, nil, filepath.Join(dir, "dup.lsdb"))
+	_, err := lexdb.Build(roots, nil, filepath.Join(dir, "dup.umcs"))
 	if err == nil {
 		t.Fatal("duplicate root_id must be rejected")
 	}
@@ -316,7 +316,7 @@ func TestValidationErrors(t *testing.T) {
 	// Word referencing unknown root
 	roots2 := []seed.Root{{RootID: 1, RootStr: "negat", Origin: "LATIN", MeaningEN: "deny"}}
 	words2 := []seed.Word{{WordID: 8193, RootID: 2, Variant: 1, Word: "bom", Lang: "PT", Norm: "bom"}}
-	_, err = lexdb.Build(roots2, words2, filepath.Join(dir, "orphan.lsdb"))
+	_, err = lexdb.Build(roots2, words2, filepath.Join(dir, "orphan.umcs"))
 	if err == nil {
 		t.Fatal("word with unknown root_id must be rejected")
 	}

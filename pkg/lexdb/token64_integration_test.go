@@ -18,7 +18,7 @@ import (
 func buildAnnotatedLexicon(t *testing.T) (*lexdb.Lexicon, string) {
 	t.Helper()
 	dir := t.TempDir()
-	outPath := filepath.Join(dir, "annotated.lsdb")
+	outPath := filepath.Join(dir, "annotated.umcs")
 
 	roots := []seed.Root{
 		{RootID: 10, RootStr: "terr", Origin: "LATIN", MeaningEN: "fear"},
@@ -107,7 +107,7 @@ func TestBuildAndLoadMissingCols(t *testing.T) {
 	words := []seed.Word{
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "testing", Lang: "EN", Norm: "testing", Sentiment: 0},
 	}
-	path := filepath.Join(dir, "minimal.lsdb")
+	path := filepath.Join(dir, "minimal.umcs")
 	_, err := lexdb.Build(roots, words, path)
 	if err != nil {
 		t.Fatalf("build: %v", err)
@@ -233,7 +233,7 @@ func TestSentimentNewDimsRoundtrip(t *testing.T) {
 	words := []seed.Word{
 		{WordID: 4097, RootID: 1, Variant: 1, Word: "terror", Lang: "EN", Norm: "terror", Sentiment: sent},
 	}
-	path := filepath.Join(dir, "roundtrip.lsdb")
+	path := filepath.Join(dir, "roundtrip.umcs")
 	if _, err := lexdb.Build(roots, words, path); err != nil {
 		t.Fatalf("build: %v", err)
 	}

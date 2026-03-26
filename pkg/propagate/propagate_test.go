@@ -13,11 +13,11 @@ import (
 func buildPropLex(t *testing.T, roots []seed.Root, words []seed.Word) *lexdb.Lexicon {
 	t.Helper()
 	dir := t.TempDir()
-	_, err := lexdb.Build(roots, words, filepath.Join(dir, "prop.lsdb"))
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "prop.umcs"))
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	lex, err := lexdb.Load(filepath.Join(dir, "prop.lsdb"))
+	lex, err := lexdb.Load(filepath.Join(dir, "prop.umcs"))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
