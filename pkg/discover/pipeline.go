@@ -20,6 +20,7 @@ type Config struct {
 	MaxDepth  int      // BFS depth (1 = seeds only, 2 = seeds + their translations)
 	Limit     int      // max new words to add in this run
 	DryRun    bool     // if true, print results but do not modify CSVs
+	Reset     bool     // if true, delete checkpoint before running (fresh exploration)
 	OutDir    string   // directory containing roots.csv, words.csv, checkpoints
 	RootsPath string   // full path to roots.csv
 	WordsPath string   // full path to words.csv
@@ -92,6 +93,9 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 
 	// Checkpoint for resumable runs.
 	cpPath := CheckpointPath(cfg.OutDir)
+	if cfg.Reset {
+		os.Remove(cpPath) // ignore error — file may not exist
+	}
 	cp, err := LoadCheckpoint(cpPath)
 	if err != nil {
 		return nil, fmt.Errorf("checkpoint: %w", err)
@@ -114,9 +118,11 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 			if err := WriteStagedCSV(pendingStaged, StagedPath(cfg.OutDir)); err != nil {
 				logf("  warning: staged: %v", err)
 			}
-			if err := cp.Save(cpPath); err != nil {
-				logf("  warning: checkpoint save: %v", err)
-			}
+		}
+		// Always save checkpoint (even in dry-run) so the next run doesn't
+		// re-fetch pages we already inspected.
+		if err := cp.Save(cpPath); err != nil {
+			logf("  warning: checkpoint save: %v", err)
 		}
 		pendingRoots = nil
 		pendingWords = nil
@@ -266,7 +272,9 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 			}
 
 			// Queue this translation for BFS expansion at next depth.
-			if item.depth+1 < cfg.MaxDepth && stats.WordsAdded < cfg.Limit {
+			// Translations of blocked roots are NOT expanded: fetching their
+			// Wiktionary page would create spurious new roots outside the blocked set.
+			if !blockedRoots[rootID] && item.depth+1 < cfg.MaxDepth && stats.WordsAdded < cfg.Limit {
 				nextKey := trans.Word + "_" + trans.Lang
 				if !visited[nextKey] {
 					visited[nextKey] = true

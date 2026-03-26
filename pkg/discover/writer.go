@@ -16,25 +16,29 @@ import (
 )
 
 // Checkpoint tracks which words have already been processed so runs can be resumed.
+// Processed is a set (map) for O(1) lookup; serialised as a JSON object.
 type Checkpoint struct {
-	Processed  []string `json:"processed"`
-	LastRootID uint32   `json:"last_root_id"`
-	LastRun    string   `json:"last_run"`
+	Processed map[string]bool `json:"processed"`
+	LastRun   string          `json:"last_run"`
 }
 
 // LoadCheckpoint reads the checkpoint from path or returns an empty one.
+// Handles the old list format gracefully by starting fresh on parse error.
 func LoadCheckpoint(path string) (*Checkpoint, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return &Checkpoint{}, nil
+		return &Checkpoint{Processed: make(map[string]bool)}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	var cp Checkpoint
 	if err := json.Unmarshal(data, &cp); err != nil {
-		log.Printf("warning: checkpoint corrupt, starting fresh: %v", err)
-		return &Checkpoint{}, nil
+		log.Printf("warning: checkpoint format changed, starting fresh: %v", err)
+		return &Checkpoint{Processed: make(map[string]bool)}, nil
+	}
+	if cp.Processed == nil {
+		cp.Processed = make(map[string]bool)
 	}
 	return &cp, nil
 }
@@ -51,17 +55,12 @@ func (cp *Checkpoint) Save(path string) error {
 
 // IsProcessed reports whether a fetch key was already processed.
 func (cp *Checkpoint) IsProcessed(key string) bool {
-	for _, k := range cp.Processed {
-		if k == key {
-			return true
-		}
-	}
-	return false
+	return cp.Processed[key]
 }
 
 // Mark records a key as processed.
 func (cp *Checkpoint) Mark(key string) {
-	cp.Processed = append(cp.Processed, key)
+	cp.Processed[key] = true
 }
 
 // Flush appends new roots and words to the CSV files.
@@ -80,7 +79,7 @@ func Flush(newRoots []seed.Root, newWords []seed.Word, rootsPath, wordsPath stri
 }
 
 func appendRoots(roots []seed.Root, path string) error {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
 	}
@@ -106,7 +105,7 @@ func appendRoots(roots []seed.Root, path string) error {
 }
 
 func appendWords(words []seed.Word, path string) error {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
 	}

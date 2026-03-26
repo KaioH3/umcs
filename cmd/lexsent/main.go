@@ -11,7 +11,7 @@
 //	lexsent tokenize <text>
 //	lexsent stats    [--productive]
 //	lexsent serve    [--port PORT]
-//	lexsent discover [--expand | --seed words] [--lang CODES] [--depth N] [--limit N] [--dry-run]
+//	lexsent discover [--expand | --seed words] [--lang CODES] [--depth N] [--limit N] [--dry-run] [--reset]
 //	lexsent import   --dump PATH [--lang CODES] [--limit N] [--dry-run] [--verbose]
 package main
 
@@ -670,6 +670,7 @@ func cmdDiscover(args []string) {
 	depth := 2
 	limit := 200
 	dryRun := false
+	reset := false
 	outDir := "data"
 	rootsPath := "data/roots.csv"
 	wordsPath := "data/words.csv"
@@ -695,6 +696,8 @@ func cmdDiscover(args []string) {
 			i++
 		case "--dry-run":
 			dryRun = true
+		case "--reset":
+			reset = true
 		case "--out":
 			outDir = args[i+1]; i++
 		case "--roots":
@@ -744,6 +747,7 @@ func cmdDiscover(args []string) {
 		MaxDepth:  depth,
 		Limit:     limit,
 		DryRun:    dryRun,
+		Reset:     reset,
 		OutDir:    outDir,
 		RootsPath: rootsPath,
 		WordsPath: wordsPath,
@@ -755,11 +759,14 @@ func cmdDiscover(args []string) {
 	fmt.Printf("  Langs:  %s\n", langs)
 	fmt.Printf("  Depth:  %d\n", depth)
 	fmt.Printf("  Limit:  %d new words\n", limit)
+	mode := "LIVE (will append to CSVs)"
 	if dryRun {
-		fmt.Println("  Mode:   DRY RUN (no files modified)")
-	} else {
-		fmt.Println("  Mode:   LIVE (will append to CSVs)")
+		mode = "DRY RUN (no files modified)"
 	}
+	if reset {
+		mode += " [checkpoint reset]"
+	}
+	fmt.Printf("  Mode:   %s\n", mode)
 	fmt.Println()
 
 	stats, err := discover.Run(cfg, roots, words)
@@ -906,6 +913,6 @@ Commands:
   tokenize <text>
   stats    [--productive]
   serve    [--port PORT]
-  discover [--expand | --seed word1,word2] [--lang PT,EN,...] [--depth N] [--limit N] [--dry-run] [--verbose]
+  discover [--expand | --seed word1,word2] [--lang PT,EN,...] [--depth N] [--limit N] [--dry-run] [--reset] [--verbose]
   import   --dump PATH.xml.bz2 [--lang PT,EN,...] [--limit N] [--dry-run] [--verbose] [--batch N]`)
 }
