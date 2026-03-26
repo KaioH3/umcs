@@ -21,22 +21,35 @@ const (
 	RootRecordSize = 32 // extended with etymology fields
 	WordRecordSize = 32
 
-	// Lang bitmask flags (bits in Header.LangFlags and Root.LangCoverage)
-	LangPT uint32 = 1 << 0
-	LangEN uint32 = 1 << 1
-	LangES uint32 = 1 << 2
-	LangIT uint32 = 1 << 3
-	LangDE uint32 = 1 << 4
-	LangFR uint32 = 1 << 5
-	LangNL uint32 = 1 << 6
-	LangAR uint32 = 1 << 7
-	LangZH uint32 = 1 << 8
-	LangJA uint32 = 1 << 9
-	LangRU uint32 = 1 << 10
-	LangKO uint32 = 1 << 11
-	// bits 12..31 reserved for future languages
+	// Lang bitmask flags (bits in Header.LangFlags and Root.LangCoverage).
+	// One bit per language; supports up to 32 languages in a uint32.
+	LangPT uint32 = 1 << 0  // Portuguese
+	LangEN uint32 = 1 << 1  // English
+	LangES uint32 = 1 << 2  // Spanish
+	LangIT uint32 = 1 << 3  // Italian
+	LangDE uint32 = 1 << 4  // German
+	LangFR uint32 = 1 << 5  // French
+	LangNL uint32 = 1 << 6  // Dutch
+	LangAR uint32 = 1 << 7  // Arabic (Semitic; RTL; trilateral root system)
+	LangZH uint32 = 1 << 8  // Mandarin Chinese (CJK; logographic)
+	LangJA uint32 = 1 << 9  // Japanese (CJK; mixed kana/kanji)
+	LangRU uint32 = 1 << 10 // Russian (Slavic; Cyrillic script)
+	LangKO uint32 = 1 << 11 // Korean (Hangul; Altaic family)
+	LangTG uint32 = 1 << 12 // Tupi-Guarani (South American indigenous; Latin script)
+	LangHI uint32 = 1 << 13 // Hindi (Indo-Aryan; Devanagari script)
+	LangBN uint32 = 1 << 14 // Bengali (Indo-Aryan; Bengali script)
+	LangID uint32 = 1 << 15 // Indonesian/Malay (Austronesian; Latin script)
+	LangTR uint32 = 1 << 16 // Turkish (Turkic; Latin script)
+	LangFA uint32 = 1 << 17 // Persian/Farsi (Iranian; Arabic script)
+	LangSW uint32 = 1 << 18 // Swahili (Bantu; Latin script)
+	LangUK uint32 = 1 << 19 // Ukrainian (Slavic; Cyrillic script)
+	LangPL uint32 = 1 << 20 // Polish (Slavic; Latin script)
+	LangSA uint32 = 1 << 21 // Sanskrit (Indo-Aryan; Devanagari; classical ancestor)
+	LangTA uint32 = 1 << 22 // Tamil (Dravidian; Tamil script)
+	LangHE uint32 = 1 << 23 // Hebrew (Semitic; RTL; trilateral root system)
+	// bits 24..31 reserved
 
-	// Word.Lang values
+	// Word.Lang values (IDs, not bitmasks — stored in WordRecord.Lang).
 	WordLangPT uint32 = 0
 	WordLangEN uint32 = 1
 	WordLangES uint32 = 2
@@ -49,16 +62,70 @@ const (
 	WordLangJA uint32 = 9
 	WordLangRU uint32 = 10
 	WordLangKO uint32 = 11
+	WordLangTG uint32 = 12
+	WordLangHI uint32 = 13
+	WordLangBN uint32 = 14
+	WordLangID uint32 = 15
+	WordLangTR uint32 = 16
+	WordLangFA uint32 = 17
+	WordLangSW uint32 = 18
+	WordLangUK uint32 = 19
+	WordLangPL uint32 = 20
+	WordLangSA uint32 = 21
+	WordLangTA uint32 = 22
+	WordLangHE uint32 = 23
 
-	// Word.Flags bitmask
-	WordFlagProper      uint32 = 1 << 0
-	WordFlagArchaic     uint32 = 1 << 1
-	WordFlagColloquial  uint32 = 1 << 2
-	WordFlagDomain      uint32 = 1 << 3
-	WordFlagFalseFriend uint32 = 1 << 4 // looks like a cognate but has different meaning
+	// Word.Flags bitmask.
+	//
+	// Low byte (bits 7..0): lexical type flags
+	WordFlagProper      uint32 = 1 << 0 // proper noun / named entity
+	WordFlagArchaic     uint32 = 1 << 1 // obsolete / historical usage
+	WordFlagColloquial  uint32 = 1 << 2 // colloquial / spoken register
+	WordFlagDomain      uint32 = 1 << 3 // domain-specific term
+	WordFlagFalseFriend uint32 = 1 << 4 // looks like cognate but has different meaning
 	WordFlagLoanword    uint32 = 1 << 5 // borrowed from another language
 	WordFlagAllomorph   uint32 = 1 << 6 // phonological variant of a morpheme
-	WordFlagOnomatopeia uint32 = 1 << 7 // word that sounds like what it means
+	WordFlagOnomatopeia uint32 = 1 << 7 // word sounds like its referent
+
+	// Bits 11..8: REGISTER (4-bit enum) — formality/register of the word.
+	// Encode as (value << 8) and extract with (flags >> 8) & 0xF.
+	RegisterNeutral    uint32 = 0 << 8
+	RegisterFormal     uint32 = 1 << 8 // written/official language
+	RegisterInformal   uint32 = 2 << 8 // conversational
+	RegisterSlang      uint32 = 3 << 8 // slang / street language
+	RegisterVulgar     uint32 = 4 << 8 // vulgar / taboo
+	RegisterArchaic    uint32 = 5 << 8 // historical / obsolete register
+	RegisterPoetic     uint32 = 6 << 8 // literary / poetic
+	RegisterTechnical  uint32 = 7 << 8 // domain-specific technical
+	RegisterScientific uint32 = 8 << 8 // scientific nomenclature
+	RegisterChild      uint32 = 9 << 8 // child-directed speech (early AoA)
+	RegisterRegional   uint32 = 10 << 8
+	RegisterMask       uint32 = 0xF << 8
+
+	// Bits 15..12: ONTOLOGICAL category (4-bit enum) — what kind of thing the word refers to.
+	// Encode as (value << 12) and extract with (flags >> 12) & 0xF.
+	OntoNone       uint32 = 0 << 12
+	OntoPerson     uint32 = 1 << 12 // human / agent
+	OntoPlace      uint32 = 2 << 12 // location / space
+	OntoArtifact   uint32 = 3 << 12 // man-made object
+	OntoNatural    uint32 = 4 << 12 // natural object (animal, plant, mineral)
+	OntoEvent      uint32 = 5 << 12 // action / occurrence
+	OntoState      uint32 = 6 << 12 // state of affairs / condition
+	OntoProperty   uint32 = 7 << 12 // quality / attribute
+	OntoQuantity   uint32 = 8 << 12 // number / amount / measure
+	OntoRelation   uint32 = 9 << 12 // relation / connection
+	OntoTemporal   uint32 = 10 << 12
+	OntoBiological uint32 = 11 << 12 // biological / body
+	OntoSocial     uint32 = 12 << 12 // social / institution
+	OntoAbstract   uint32 = 13 << 12 // abstract concept
+	OntoMask       uint32 = 0xF << 12
+
+	// Bits 19..16: POLYSEMY tier (4-bit count) — how many distinct senses the word has.
+	// 0=unknown, 1=monosemous, 2=2 senses, … max 15.
+	PolysemyMask uint32 = 0xF << 16
+
+	// Bit 20: CULTURAL_SPECIFIC — no equivalent in most other languages (e.g. "saudade", "schadenfreude").
+	CulturalSpecific uint32 = 1 << 20
 )
 
 // Header is the 64-byte file header.
@@ -102,30 +169,28 @@ type WordRecord struct {
 	Flags      uint32    // WordFlag* bitmask
 }
 
-// LangName maps a lang ID to its ISO 639-1 code.
+// LangName maps a lang ID to its ISO 639-1/639-2 code.
 func LangName(lang uint32) string {
-	names := []string{"PT", "EN", "ES", "IT", "DE", "FR", "NL", "AR", "ZH", "JA", "RU", "KO"}
+	names := []string{
+		"PT", "EN", "ES", "IT", "DE", "FR", "NL", "AR",
+		"ZH", "JA", "RU", "KO", "TG", "HI", "BN", "ID",
+		"TR", "FA", "SW", "UK", "PL", "SA", "TA", "HE",
+	}
 	if int(lang) < len(names) {
 		return names[lang]
 	}
 	return "??"
 }
 
-// ParseLang converts a language string to its lang ID.
+// ParseLang converts a language code to its lang ID.
 func ParseLang(s string) (uint32, bool) {
 	langs := map[string]uint32{
-		"PT": WordLangPT,
-		"EN": WordLangEN,
-		"ES": WordLangES,
-		"IT": WordLangIT,
-		"DE": WordLangDE,
-		"FR": WordLangFR,
-		"NL": WordLangNL,
-		"AR": WordLangAR,
-		"ZH": WordLangZH,
-		"JA": WordLangJA,
-		"RU": WordLangRU,
-		"KO": WordLangKO,
+		"PT": WordLangPT, "EN": WordLangEN, "ES": WordLangES, "IT": WordLangIT,
+		"DE": WordLangDE, "FR": WordLangFR, "NL": WordLangNL, "AR": WordLangAR,
+		"ZH": WordLangZH, "JA": WordLangJA, "RU": WordLangRU, "KO": WordLangKO,
+		"TG": WordLangTG, "HI": WordLangHI, "BN": WordLangBN, "ID": WordLangID,
+		"TR": WordLangTR, "FA": WordLangFA, "SW": WordLangSW, "UK": WordLangUK,
+		"PL": WordLangPL, "SA": WordLangSA, "TA": WordLangTA, "HE": WordLangHE,
 	}
 	id, ok := langs[s]
 	return id, ok

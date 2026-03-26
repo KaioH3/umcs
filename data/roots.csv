@@ -84,3 +84,39 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id
 83,merd,LATIN,excrement vulgar,from Latin merda — merde/merda/mierda/shit — excrement,0
 84,fod,PROTO_GERMANIC,sexual vulgar intensifier,Proto-Germanic *fug — fuck/foda/foder/fotre — vulgar sexual act; doubles as intensifier,0
 85,putan,LATIN,insult/vulgar intensifier,from Latin puta (girl/whore) — puta/putain/puttana — strongest negative intensifier in Romance,0
+86,spec,LATIN,to look or observe,from spectare/specere — spectacular/especial/special/spécial,0
+87,grad,LATIN,step or degree,from gradus — gradual/grade/grado/grau — progression root,0
+88,lux,LATIN,light or brightness,from lux/lucis — luz/luce/lucid — luminosity root,0
+89,corp,LATIN,body or substance,from corpus/corporis — corpo/cuerpo/corps/Körper,0
+90,man,LATIN,hand or agency,from manus — mão/mano/main — manual root,0
+91,aqua,LATIN,water,from aqua — água/agua/acqua/eau — universal water root,0
+92,terra,LATIN,earth or land,from terra — terra/tierra/terre — earth root,0
+93,path,GREEK,suffering or feeling,from pathos — pathos/pathético/pathétique,0
+94,log,GREEK,word or reason,from logos — lógica/logic/logique,0
+95,phil,GREEK,love or fondness,from philein — filosofia/philosophy/philosophie,0
+96,auto,GREEK,self,from autos — automático/automatic/automatique,0
+97,krat,GREEK,power or rule,from kratos — democracia/democracy/démocratie,0
+98,cru,LATIN,raw or cruel,from crudus/crudelis — cruel/crueldade/cruauté,0
+99,dulc,LATIN,sweet or pleasant,from dulcis — doce/dulce/doux/dolce,0
+100,san,LATIN,healthy or whole,from sanus — são/sano/sain/sane,0
+101,miser,LATIN,wretched or pitiable,from miser — mísero/miserable/misère/misery,0
+102,febr,LATIN,fever or heat,from febris — febre/fiebre/fièvre/fever,0
+103,frat,LATIN,brother or fraternal bond,from frater — frère/fratello/fraternidade,0
+104,patr,LATIN,father or homeland,from pater/patria — pai/père/pátria/patriot,0
+105,sacr,LATIN,sacred or devoted,from sacer — sagrado/sacré/sacro/sacred,0
+106,cord,LATIN,heart or core,from cor/cordis — coração/corazón/cœur/cuore/cordial,0
+107,mund,LATIN,world or clean,from mundus — mundo/monde/mondo/mundane,0
+108,soci,LATIN,companion or society,from socius — sociedade/sociedad/société/society,0
+109,natur,LATIN,nature or birth,from natura/natus — natureza/nature/natura/Natur,0
+110,y,TUPI,water,Tupi y=water; root of Iguaçu(great water)/Igarapé/Ipiranga,0
+111,tup,TUPI,divine or thunder,Tupi Tupã=thunder god; sacred root of Tupinambá people,0
+112,aba,TUPI,person or human being,Tupi abá=person; root of Tupinambá(real people),0
+113,caa,TUPI,forest or plant or herb,Tupi caá=plant/forest; root of caatinga/caju/caipira,0
+114,slm,ARABIC,peace or safety,Arabic s-l-m root — salam/salim/muslim/shalom(HE cognate),0
+115,hbb,ARABIC,love or affection,Arabic h-b-b root — hubb(love)/habib(beloved),0
+116,jml,ARABIC,beauty or completeness,Arabic j-m-l root — jamal(beauty)/jamil(beautiful),0
+117,frh,ARABIC,joy or happiness,Arabic f-r-h root — farah(joy)/farhan(happy),0
+118,sukh,SANSKRIT,happiness or ease,Sanskrit sukha — antonym of dukkha; Buddhist/Hindu core concept,0
+119,duhkh,SANSKRIT,suffering or pain,Sanskrit dukkha — fundamental Buddhist concept of suffering,118
+120,shant,SANSKRIT,peace or tranquility,Sanskrit shanti — shanti(peace) across Hindi/Bengali/Marathi,0
+121,dharm,SANSKRIT,moral order or duty,Sanskrit dharma — moral law across Hindu/Buddhist/Jain traditions,0

@@ -5,8 +5,9 @@ import (
 	"strings"
 )
 
-// Pack assembles a sentiment bitmask from human-readable string fields.
-// Used by the CSV seed loader to convert CSV columns to a packed uint32.
+// Pack assembles a sentiment bitmask from the core sentiment fields.
+// New dimensions (POS, arousal, dominance, AoA, concreteness) default to zero.
+// Use PackExtended for full annotation.
 func Pack(polarity, intensity, role, domain string, flags []string) (uint32, error) {
 	var s uint32
 
@@ -45,14 +46,58 @@ func Pack(polarity, intensity, role, domain string, flags []string) (uint32, err
 	return s, nil
 }
 
+// PackExtended assembles the full sentiment bitmask including all semantic dimensions.
+// Empty strings default to 0/NONE for the respective field.
+func PackExtended(polarity, intensity, role, domain string, flags []string, pos, arousal, dominance, aoa, concreteness string) (uint32, error) {
+	s, err := Pack(polarity, intensity, role, domain, flags)
+	if err != nil {
+		return 0, err
+	}
+
+	p, err := parsePOS(pos)
+	if err != nil {
+		return 0, err
+	}
+	s |= p
+
+	ar, err := parseArousal(arousal)
+	if err != nil {
+		return 0, err
+	}
+	s |= ar
+
+	dom, err := parseDominance(dominance)
+	if err != nil {
+		return 0, err
+	}
+	s |= dom
+
+	a, err := parseAOA(aoa)
+	if err != nil {
+		return 0, err
+	}
+	s |= a
+
+	if strings.ToUpper(strings.TrimSpace(concreteness)) == "CONCRETE" {
+		s |= Concrete
+	}
+
+	return s, nil
+}
+
 // Decode returns a human-readable map of all sentiment fields.
 func Decode(s uint32) map[string]string {
 	return map[string]string{
-		"polarity":  polarityName(Polarity(s)),
-		"intensity": intensityName(Intensity(s)),
-		"role":      roleName(Role(s)),
-		"domain":    domainNames(Domain(s)),
-		"flags":     flagNames(s),
+		"polarity":    polarityName(Polarity(s)),
+		"intensity":   intensityName(Intensity(s)),
+		"role":        roleName(Role(s)),
+		"domain":      domainNames(Domain(s)),
+		"flags":       flagNames(s),
+		"pos":         posName(POS(s)),
+		"arousal":     levelName(Arousal(s)),
+		"dominance":   levelName(Dominance(s)),
+		"aoa":         aoaName(AOA(s)),
+		"concreteness": concretenessName(s),
 	}
 }
 
@@ -163,6 +208,111 @@ func parseFlag(s string) (uint32, error) {
 		return 0, nil
 	}
 	return 0, fmt.Errorf("unknown flag %q", s)
+}
+
+func parsePOS(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "OTHER":
+		return POSOther, nil
+	case "NOUN":
+		return POSNoun, nil
+	case "VERB":
+		return POSVerb, nil
+	case "ADJ":
+		return POSAdj, nil
+	case "ADV":
+		return POSAdv, nil
+	case "PARTICLE":
+		return POSParticle, nil
+	case "PREP":
+		return POSPrep, nil
+	case "CONJ":
+		return POSConj, nil
+	}
+	return 0, fmt.Errorf("unknown pos %q", s)
+}
+
+func parseArousal(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "NONE":
+		return ArousalNone, nil
+	case "LOW":
+		return ArousalLow, nil
+	case "MED", "MEDIUM":
+		return ArousalMed, nil
+	case "HIGH":
+		return ArousalHigh, nil
+	}
+	return 0, fmt.Errorf("unknown arousal %q", s)
+}
+
+func parseDominance(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "NONE":
+		return DominanceNone, nil
+	case "LOW":
+		return DominanceLow, nil
+	case "MED", "MEDIUM":
+		return DominanceMed, nil
+	case "HIGH":
+		return DominanceHigh, nil
+	}
+	return 0, fmt.Errorf("unknown dominance %q", s)
+}
+
+func parseAOA(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "EARLY":
+		return AOAEarly, nil
+	case "MID":
+		return AOAMid, nil
+	case "LATE":
+		return AOALate, nil
+	case "TECHNICAL":
+		return AOATechnical, nil
+	}
+	return 0, fmt.Errorf("unknown aoa %q", s)
+}
+
+func posName(p uint32) string {
+	names := []string{"OTHER", "NOUN", "VERB", "ADJ", "ADV", "PARTICLE", "PREP", "CONJ"}
+	if int(p) < len(names) {
+		return names[p]
+	}
+	return "OTHER"
+}
+
+func levelName(v uint32) string {
+	switch v {
+	case 1:
+		return "LOW"
+	case 2:
+		return "MED"
+	case 3:
+		return "HIGH"
+	default:
+		return "NONE"
+	}
+}
+
+func aoaName(v uint32) string {
+	switch v {
+	case AOAMid:
+		return "MID"
+	case AOALate:
+		return "LATE"
+	case AOATechnical:
+		return "TECHNICAL"
+	default:
+		return "EARLY"
+	}
+}
+
+func concretenessName(s uint32) string {
+	if IsConcrete(s) {
+		return "CONCRETE"
+	}
+	return "ABSTRACT"
 }
 
 func polarityName(p uint32) string {

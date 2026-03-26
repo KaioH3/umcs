@@ -1,18 +1,50 @@
-// Package sentiment implements a compact uint32 bitmask encoding sentiment,
-// semantic role, domain, polarity, and intensity for any word.
+// Package sentiment implements a compact uint32 bitmask encoding the full
+// semantic payload of a word: polarity, intensity, role, domain, scope,
+// part-of-speech, concreteness, arousal, dominance, and age-of-acquisition.
 //
-// Bitmask layout:
-//   bits 31..28  reserved (0)
-//   bit  27      INTENSIFIER        — amplifies adjacent sentiment
-//   bit  26      DOWNTONER          — reduces adjacent sentiment
-//   bit  25      NEGATION_MARKER    — inverts scope of next N tokens
-//   bit  24      AFFIRMATION_MARKER — confirms scope
-//   bits 23..20  SEMANTIC_ROLE (4-bit enum)
-//   bits 19..16  INTENSITY (0–4)
-//   bits 15..8   DOMAIN (8 flags)
-//   bits 7..6    POLARITY (2 bits)
-//   bits 5..0    reserved (0)
+// Bitmask layout (all 32 bits used):
+//
+//	bits 31..29  POS (3 bits)             — NOUN/VERB/ADJ/ADV/PARTICLE/PREP/CONJ
+//	bit  28      CONCRETENESS (1 bit)     — 1=concrete, 0=abstract
+//	bit  27      INTENSIFIER              — amplifies adjacent sentiment
+//	bit  26      DOWNTONER                — reduces adjacent sentiment
+//	bit  25      NEGATION_MARKER          — inverts scope of next N tokens
+//	bit  24      AFFIRMATION_MARKER       — confirms scope
+//	bits 23..20  SEMANTIC_ROLE (4-bit)    — EVALUATION/EMOTION/COGNITION/…
+//	bits 19..16  INTENSITY (0–4)          — NONE/WEAK/MODERATE/STRONG/EXTREME
+//	bits 15..8   DOMAIN (8 flags)         — GENERAL/FINANCIAL/MEDICAL/…
+//	bits 7..6    POLARITY (2 bits)        — NEUTRAL/POSITIVE/NEGATIVE/AMBIGUOUS
+//	bits 5..4    AROUSAL (2 bits)         — activation: NONE/LOW/MED/HIGH
+//	bits 3..2    DOMINANCE (2 bits)       — power/control: NONE/LOW/MED/HIGH
+//	bits 1..0    AOA (2 bits)             — age of acquisition: EARLY/MID/LATE/TECHNICAL
+//
+// Combined with the word_id coordinate (root_id<<12|variant) this sentiment
+// uint32 forms the lower half of a Token64 — a single uint64 that encodes
+// the complete semantic position of a word without any external lookup.
 package sentiment
+
+// ── Part of speech (bits 31..29) ─────────────────────────────────────────────
+
+const (
+	POSOther    uint32 = 0 << 29
+	POSNoun     uint32 = 1 << 29
+	POSVerb     uint32 = 2 << 29
+	POSAdj      uint32 = 3 << 29
+	POSAdv      uint32 = 4 << 29
+	POSParticle uint32 = 5 << 29
+	POSPrep     uint32 = 6 << 29
+	POSConj     uint32 = 7 << 29
+	POSMask     uint32 = 0b111 << 29
+)
+
+// Concreteness (bit 28): 1 = concrete (chair, fire), 0 = abstract (freedom, time).
+
+const (
+	Concrete uint32 = 1 << 28
+	Abstract uint32 = 0
+)
+
+// ── Polarity (bits 7..6) ──────────────────────────────────────────────────────
 
 // Polarity values (bits 7..6).
 const (
@@ -21,6 +53,43 @@ const (
 	PolarityNegative  uint32 = 0b10 << 6
 	PolarityAmbiguous uint32 = 0b11 << 6
 	PolarityMask      uint32 = 0b11 << 6
+)
+
+// ── Arousal (bits 5..4) ───────────────────────────────────────────────────────
+// Psycholinguistic activation level, orthogonal to valence.
+// HIGH arousal: "rage", "ecstasy", "panic". LOW: "boredom", "calm", "content".
+
+const (
+	ArousalNone uint32 = 0 << 4
+	ArousalLow  uint32 = 1 << 4
+	ArousalMed  uint32 = 2 << 4
+	ArousalHigh uint32 = 3 << 4
+	ArousalMask uint32 = 0b11 << 4
+)
+
+// ── Dominance (bits 3..2) ─────────────────────────────────────────────────────
+// Sense of power/control the concept evokes (VAD model, third axis).
+// HIGH: "command", "authority". LOW: "trapped", "helpless", "submissive".
+
+const (
+	DominanceNone uint32 = 0 << 2
+	DominanceLow  uint32 = 1 << 2
+	DominanceMed  uint32 = 2 << 2
+	DominanceHigh uint32 = 3 << 2
+	DominanceMask uint32 = 0b11 << 2
+)
+
+// ── Age of Acquisition (bits 1..0) ────────────────────────────────────────────
+// When a native speaker typically learns this word.
+// EARLY = first 1000 words a child learns (mama, water, no, good).
+// TECHNICAL = learned in professional/academic contexts only.
+
+const (
+	AOAEarly     uint32 = 0 // first ~1000 words (child ≤3y)
+	AOAMid       uint32 = 1 // school age (4–12y)
+	AOALate      uint32 = 2 // adult vocabulary
+	AOATechnical uint32 = 3 // domain-specific / academic
+	AOAMask      uint32 = 0b11
 )
 
 // Intensity values (bits 19..16). Multiply raw × 65536.
@@ -72,6 +141,8 @@ const (
 	FlagMask              uint32 = 0xF << 24
 )
 
+// ── Accessors ─────────────────────────────────────────────────────────────────
+
 // Polarity returns the polarity bits of a sentiment value.
 func Polarity(s uint32) uint32 { return s & PolarityMask }
 
@@ -83,6 +154,21 @@ func Role(s uint32) uint32 { return (s & RoleMask) >> 20 }
 
 // Domain returns the domain bitmask from a sentiment value.
 func Domain(s uint32) uint32 { return (s & DomainMask) >> 8 }
+
+// POS returns the part-of-speech from a sentiment value.
+func POS(s uint32) uint32 { return (s & POSMask) >> 29 }
+
+// IsConcrete reports whether the word refers to a concrete concept.
+func IsConcrete(s uint32) bool { return s&Concrete != 0 }
+
+// Arousal returns the arousal tier (0=NONE, 1=LOW, 2=MED, 3=HIGH).
+func Arousal(s uint32) uint32 { return (s & ArousalMask) >> 4 }
+
+// Dominance returns the dominance tier (0=NONE, 1=LOW, 2=MED, 3=HIGH).
+func Dominance(s uint32) uint32 { return (s & DominanceMask) >> 2 }
+
+// AOA returns the age-of-acquisition tier (AOAEarly/AOAMid/AOALate/AOATechnical).
+func AOA(s uint32) uint32 { return s & AOAMask }
 
 // IsNegationMarker reports whether the word inverts sentiment scope.
 func IsNegationMarker(s uint32) bool { return s&FlagNegationMarker != 0 }

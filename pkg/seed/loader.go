@@ -152,7 +152,7 @@ func LoadWords(path string) ([]Word, error) {
 			return nil, fmt.Errorf("words.csv line %d: %w", lineNum, err)
 		}
 
-		// Pack sentiment from CSV string columns
+		// Pack sentiment from CSV string columns (core + extended dimensions).
 		var scopeFlags []string
 		role := col(row, idx, "semantic_role")
 		switch role {
@@ -166,15 +166,49 @@ func LoadWords(path string) ([]Word, error) {
 			scopeFlags = append(scopeFlags, "AFFIRMATION_MARKER")
 		}
 
-		sent, err := sentiment.Pack(
+		sent, err := sentiment.PackExtended(
 			col(row, idx, "polarity"),
 			col(row, idx, "intensity"),
 			role,
 			col(row, idx, "domain"),
 			scopeFlags,
+			col(row, idx, "pos"),
+			col(row, idx, "arousal"),
+			col(row, idx, "dominance"),
+			col(row, idx, "aoa"),
+			col(row, idx, "concreteness"),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("words.csv line %d: sentiment: %w", lineNum, err)
+		}
+
+		// Pack register, ontological category, polysemy, cultural flag into flags.
+		if reg := col(row, idx, "register"); reg != "" {
+			r, err := parseRegister(reg)
+			if err != nil {
+				return nil, fmt.Errorf("words.csv line %d: register: %w", lineNum, err)
+			}
+			flags |= r
+		}
+		if onto := col(row, idx, "ontological"); onto != "" {
+			o, err := parseOntological(onto)
+			if err != nil {
+				return nil, fmt.Errorf("words.csv line %d: ontological: %w", lineNum, err)
+			}
+			flags |= o
+		}
+		if poly := col(row, idx, "polysemy"); poly != "" {
+			p, err := parseUint32(poly)
+			if err != nil {
+				return nil, fmt.Errorf("words.csv line %d: polysemy: %w", lineNum, err)
+			}
+			if p > 15 {
+				p = 15
+			}
+			flags |= (p & 0xF) << 16
+		}
+		if col(row, idx, "cultural_specific") == "1" || strings.ToUpper(col(row, idx, "cultural_specific")) == "TRUE" {
+			flags |= 1 << 20
 		}
 
 		words = append(words, Word{
@@ -206,6 +240,68 @@ func col(row []string, idx map[string]int, name string) string {
 		return ""
 	}
 	return strings.TrimSpace(row[i])
+}
+
+func parseRegister(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "NEUTRAL":
+		return 0, nil
+	case "FORMAL":
+		return 1 << 8, nil
+	case "INFORMAL":
+		return 2 << 8, nil
+	case "SLANG":
+		return 3 << 8, nil
+	case "VULGAR":
+		return 4 << 8, nil
+	case "ARCHAIC":
+		return 5 << 8, nil
+	case "POETIC":
+		return 6 << 8, nil
+	case "TECHNICAL":
+		return 7 << 8, nil
+	case "SCIENTIFIC":
+		return 8 << 8, nil
+	case "CHILD":
+		return 9 << 8, nil
+	case "REGIONAL":
+		return 10 << 8, nil
+	}
+	return 0, fmt.Errorf("unknown register %q", s)
+}
+
+func parseOntological(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "NONE":
+		return 0, nil
+	case "PERSON":
+		return 1 << 12, nil
+	case "PLACE":
+		return 2 << 12, nil
+	case "ARTIFACT":
+		return 3 << 12, nil
+	case "NATURAL":
+		return 4 << 12, nil
+	case "EVENT":
+		return 5 << 12, nil
+	case "STATE":
+		return 6 << 12, nil
+	case "PROPERTY":
+		return 7 << 12, nil
+	case "QUANTITY":
+		return 8 << 12, nil
+	case "RELATION":
+		return 9 << 12, nil
+	case "TEMPORAL":
+		return 10 << 12, nil
+	case "BIOLOGICAL":
+		return 11 << 12, nil
+	case "SOCIAL":
+		return 12 << 12, nil
+	case "ABSTRACT":
+		return 13 << 12, nil
+	}
+	return 0, fmt.Errorf("unknown ontological %q", s)
 }
 
 func parseUint32(s string) (uint32, error) {
