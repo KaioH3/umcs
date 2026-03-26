@@ -277,8 +277,17 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 	return stats, nil
 }
 
-// isValidWord returns false for wikitext markup artifacts that escaped cleaning.
+// isValidWord returns false for entries that should not be stored as lexicon words:
+//   - wikitext markup artifacts ([[...]] or {{...}})
+//   - multi-word phrases (contain a space) — these are idioms, not morphemes
+//   - single-character entries — too short to be meaningful
 func isValidWord(word string) bool {
+	if len([]rune(word)) < 2 {
+		return false
+	}
+	if strings.ContainsAny(word, " \t") {
+		return false
+	}
 	return !strings.Contains(word, "[[") &&
 		!strings.Contains(word, "{{") &&
 		!strings.Contains(word, "}}")

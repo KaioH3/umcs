@@ -51,12 +51,18 @@ func Assign(rootStr string, existing []seed.Root) (rootID uint32, isNew bool) {
 		}
 	}
 
-	// Fuzzy match — very tight threshold to avoid false assignments
+	// Fuzzy match — require high similarity AND minimum length to prevent false assignments
+	// like "color" → "dolor" (both len=5, dist=1, sim=0.80 which was accepted at 0.75).
 	bestSim := 0.0
 	var bestID uint32
 	for _, r := range existing {
-		sim := LevenshteinSim(norm, PhoneticNorm(r.RootStr))
-		if sim > bestSim && sim >= 0.75 {
+		rNorm := PhoneticNorm(r.RootStr)
+		// Require both strings to be at least 4 chars to avoid short-string noise.
+		if len([]rune(norm)) < 4 || len([]rune(rNorm)) < 4 {
+			continue
+		}
+		sim := LevenshteinSim(norm, rNorm)
+		if sim > bestSim && sim >= 0.85 {
 			bestSim = sim
 			bestID = r.RootID
 		}

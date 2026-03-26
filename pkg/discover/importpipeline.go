@@ -13,8 +13,9 @@ import (
 // ImportConfig extends Config with dump-specific settings.
 type ImportConfig struct {
 	Config
-	DumpPath  string // path to .xml or .xml.bz2 Wiktionary dump
-	BatchSize int    // flush to CSV every N new words (default: 500)
+	DumpPath      string // path to .xml or .xml.bz2 Wiktionary dump
+	BatchSize     int    // flush to CSV every N new words (default: 500)
+	AllowNewRoots bool   // if false (default), skip entries that require new roots
 }
 
 // RunImport processes a local Wiktionary XML dump using the same classify /
@@ -88,6 +89,12 @@ func RunImport(cfg ImportConfig, existingRoots []seed.Root, existingWords []seed
 			rootID, rootStr, isNewRoot := resolveRoot(entry, entry.Lang, allRoots, allWords)
 
 			if isNewRoot {
+				if !cfg.AllowNewRoots {
+					// Default: only expand known roots. New root discovery belongs to
+					// 'lexsent discover' (BFS with real etymology ancestry). Skip.
+					stats.WordsSkipped++
+					continue
+				}
 				origin := entry.AncestorLang
 				if origin == "" {
 					origin = "UNKNOWN"
