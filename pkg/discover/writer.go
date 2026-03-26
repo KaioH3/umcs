@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/kak/umcs/pkg/infer"
@@ -157,17 +158,29 @@ func appendWords(words []seed.Word, path string) error {
 	return w.Error()
 }
 
-// WriteStagedCSV writes low-confidence words to a staging file for manual review.
-// The file uses the same format as words.csv.
+// WriteStagedCSV appends low-confidence words to the staging file for manual review.
+// Deduplicates by (word, lang) against existing entries to avoid accumulating duplicates
+// across multiple discover runs.
 func WriteStagedCSV(staged []StagedWord, path string) error {
 	if len(staged) == 0 {
 		return nil
 	}
-	writeHeader := true
-	if _, err := os.Stat(path); err == nil {
-		writeHeader = false
+
+	// Load existing (word,lang) keys to skip duplicates.
+	existing := map[string]bool{}
+	if data, err := os.ReadFile(path); err == nil {
+		r := csv.NewReader(strings.NewReader(string(data)))
+		r.FieldsPerRecord = -1
+		records, _ := r.ReadAll()
+		for i, rec := range records {
+			if i == 0 || len(rec) < 2 {
+				continue
+			}
+			existing[rec[0]+"_"+rec[1]] = true
+		}
 	}
 
+	writeHeader := len(existing) == 0
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
@@ -182,6 +195,11 @@ func WriteStagedCSV(staged []StagedWord, path string) error {
 		})
 	}
 	for _, s := range staged {
+		key := s.Word + "_" + s.Lang
+		if existing[key] {
+			continue
+		}
+		existing[key] = true
 		_ = w.Write([]string{
 			s.Word, s.Lang, s.RootStr,
 			fmt.Sprintf("%d", s.ProposedRootID),

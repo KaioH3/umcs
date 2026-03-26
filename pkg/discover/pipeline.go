@@ -181,23 +181,30 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 		// This avoids false root creation when expanding from existing seeds.
 		rootID, rootStr, isNewRoot := resolveRoot(entry, item.lang, allRoots, allWords)
 
-		if isNewRoot {
-			origin := entry.AncestorLang
-			if origin == "" {
-				origin = "UNKNOWN"
+		// Track whether this new root was actually used by an accepted word.
+		// We defer committing it until we know at least one word passes the threshold.
+		rootAccepted := false
+
+		commitRootIfNew := func() {
+			if isNewRoot && !rootAccepted {
+				rootAccepted = true
+				origin := entry.AncestorLang
+				if origin == "" {
+					origin = "UNKNOWN"
+				}
+				newRoot := seed.Root{
+					RootID:       rootID,
+					RootStr:      rootStr,
+					Origin:       origin,
+					MeaningEN:    firstDef(entry.Definitions, entry.Word),
+					Notes:        "auto-discovered via Wiktionary",
+					ParentRootID: 0,
+				}
+				allRoots = append(allRoots, newRoot)
+				pendingRoots = append(pendingRoots, newRoot)
+				stats.RootsAdded++
+				logf("  + ROOT  id=%-4d str=%-12q origin=%s", rootID, rootStr, origin)
 			}
-			newRoot := seed.Root{
-				RootID:       rootID,
-				RootStr:      rootStr,
-				Origin:       origin,
-				MeaningEN:    firstDef(entry.Definitions, entry.Word),
-				Notes:        "auto-discovered via Wiktionary",
-				ParentRootID: 0,
-			}
-			allRoots = append(allRoots, newRoot)
-			pendingRoots = append(pendingRoots, newRoot)
-			stats.RootsAdded++
-			logf("  + ROOT  id=%-4d str=%-12q origin=%s", rootID, rootStr, origin)
 		}
 
 		// Try to classify and add the entry word itself.
@@ -206,6 +213,7 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 			score := classifyBest(rootID, entry, allWords)
 			if score.Confidence >= confidenceThreshold {
 				if w, ok := makeWord(rootID, entry.Word, item.lang, entryNorm, score, allWords); ok {
+					commitRootIfNew()
 					allWords = append(allWords, w)
 					known[entryNorm+"_"+item.lang] = true
 					pendingWords = append(pendingWords, w)
@@ -251,6 +259,7 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 			score := classifyBest(rootID, nil, allWords)
 			if score.Confidence >= confidenceThreshold {
 				if w, ok := makeWord(rootID, trans.Word, trans.Lang, transNorm, score, allWords); ok {
+					commitRootIfNew()
 					allWords = append(allWords, w)
 					known[transKey] = true
 					pendingWords = append(pendingWords, w)

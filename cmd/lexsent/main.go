@@ -718,13 +718,28 @@ func cmdDiscover(args []string) {
 	words, err := seed.LoadWords(wordsPath)
 	die(err)
 
+	langList := strings.Split(langs, ",")
+
 	// Build seed list.
 	var seeds []string
 	if expand {
-		// Use all English words from the existing lexicon as seeds.
+		// Use all words in the target language set as seeds.
+		// This maximises coverage: PT/ES/IT/FR/DE words seed their own
+		// Wiktionary pages, which often contain translations not reachable
+		// from the EN entry alone.
+		targetSet := map[string]bool{}
+		for _, l := range langList {
+			targetSet[l] = true
+		}
+		seen := map[string]bool{}
 		for _, w := range words {
-			if w.Lang == "EN" {
-				seeds = append(seeds, strings.ToLower(w.Word))
+			if !targetSet[w.Lang] {
+				continue
+			}
+			key := strings.ToLower(w.Word)
+			if !seen[key] {
+				seen[key] = true
+				seeds = append(seeds, key)
 			}
 		}
 	} else {
@@ -738,8 +753,6 @@ func cmdDiscover(args []string) {
 	if len(seeds) == 0 {
 		fatalf("discover: no seeds found")
 	}
-
-	langList := strings.Split(langs, ",")
 
 	cfg := discover.Config{
 		Seeds:     seeds,
