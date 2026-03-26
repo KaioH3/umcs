@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/analyze"
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/analyze"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 func buildTestLex(t *testing.T) *lexdb.Lexicon {
@@ -150,6 +150,49 @@ func TestDowntonerThenNegation(t *testing.T) {
 	// Negated MODERATE (2) → weight = -2, not -1.
 	if r.TotalScore != -2 {
 		t.Fatalf("'slightly not good': want score=-2 (negated, not downtoned), got %d", r.TotalScore)
+	}
+}
+
+// TestVerdictBoundary verifies that the threshold is strict (> 2, < -2).
+// Score of exactly 2 or -2 → NEUTRAL.
+func TestVerdictBoundary(t *testing.T) {
+	lex := buildTestLex(t)
+
+	cases := []struct {
+		text    string
+		verdict string
+		desc    string
+	}{
+		// "good" MODERATE weight=2 → score=2 → NEUTRAL (not > 2)
+		{"good", "NEUTRAL", "score=2 → NEUTRAL"},
+		// "terrible" STRONG weight=-3 → score=-3 → NEGATIVE
+		{"terrible", "NEGATIVE", "score=-3 → NEGATIVE"},
+		// "negative" MODERATE(-2) → score=-2 → NEUTRAL (not < -2)
+		{"negative", "NEUTRAL", "score=-2 → NEUTRAL"},
+	}
+	for _, c := range cases {
+		r := analyze.Analyze(lex, c.text)
+		if r.Verdict != c.verdict {
+			t.Errorf("%s: got verdict=%s score=%d, want %s", c.desc, r.Verdict, r.TotalScore, c.verdict)
+		}
+	}
+}
+
+// TestNegationWindowExpiry verifies that negation expires after negationWindow tokens.
+// "not [oov1] [oov2] [oov3] terrible" — 3 unknown tokens deplete the window
+// before "terrible", so it should NOT be negated.
+func TestNegationWindowExpiry(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "not xyz1 xyz2 xyz3 terrible")
+	// All 3 unknown words consume the negation window.
+	// "terrible" should be negative (not negated).
+	for _, tok := range r.Tokens {
+		if tok.Surface == "terrible" && tok.Negated {
+			t.Fatal("'terrible' should NOT be negated — negation window expired through 3 unknown words")
+		}
+	}
+	if r.TotalScore >= 0 {
+		t.Fatalf("negation expired: 'terrible' should be NEGATIVE, got score=%d", r.TotalScore)
 	}
 }
 

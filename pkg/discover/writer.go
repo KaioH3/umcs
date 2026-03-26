@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/kak/lex-sentiment/pkg/morpheme"
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // Checkpoint tracks which words have already been processed so runs can be resumed.

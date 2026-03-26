@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/tokenizer"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/tokenizer"
 )
 
 func buildTokenLex(t *testing.T) *lexdb.Lexicon {

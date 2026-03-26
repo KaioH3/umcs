@@ -10,8 +10,8 @@ package analyze
 import (
 	"strings"
 
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 const negationWindow = 3 // how many tokens are affected by a negation marker

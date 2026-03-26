@@ -1,7 +1,11 @@
 // Package discover implements automated word/morpheme discovery from Wiktionary.
 package discover
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kak/umcs/pkg/lexdb"
+)
 
 // IsCJK reports whether r is a CJK/Hangul/Kana ideographic character.
 // These characters are morphemes themselves and must not be stripped.
@@ -25,54 +29,17 @@ func hasCJK(word string) bool {
 
 // PhoneticNorm lowercases a word and removes common diacritics for comparison.
 // For CJK words the characters are preserved unchanged (each is its own morpheme).
+//
+// For non-CJK words, this delegates to lexdb.Normalize(), the single canonical
+// diacritic-stripping function. This guarantees that discovery and lookup use
+// exactly the same normalization — a word accepted during discovery will always
+// be found by LookupWord later.
 func PhoneticNorm(word string) string {
 	if hasCJK(word) {
 		// CJK: strip spaces and lowercase ASCII portions, preserve ideograms
 		return strings.TrimSpace(strings.ToLower(word))
 	}
-	var b strings.Builder
-	for _, r := range strings.ToLower(word) {
-		switch r {
-		// Acute, grave, circumflex, tilde, umlaut
-		case 'á', 'à', 'â', 'ã', 'ä', 'ā', 'ă', 'ą':
-			b.WriteRune('a')
-		case 'é', 'è', 'ê', 'ë', 'ē', 'ě', 'ę':
-			b.WriteRune('e')
-		case 'í', 'ì', 'î', 'ï', 'ī', 'ĭ', 'į':
-			b.WriteRune('i')
-		case 'ó', 'ò', 'ô', 'õ', 'ö', 'ō', 'ő':
-			b.WriteRune('o')
-		case 'ú', 'ù', 'û', 'ü', 'ū', 'ű', 'ů':
-			b.WriteRune('u')
-		case 'ç', 'ć', 'č':
-			b.WriteRune('c')
-		case 'ñ', 'ń', 'ň':
-			b.WriteRune('n')
-		case 'ß':
-			b.WriteString("ss")
-		case 'ý', 'ÿ':
-			b.WriteRune('y')
-		case 'ž', 'ź', 'ż':
-			b.WriteRune('z')
-		case 'š', 'ś':
-			b.WriteRune('s')
-		case 'ř':
-			b.WriteRune('r')
-		case 'ğ':
-			b.WriteRune('g')
-		case 'ł':
-			b.WriteRune('l')
-		case 'đ':
-			b.WriteRune('d')
-		case 'æ':
-			b.WriteString("ae")
-		case 'œ':
-			b.WriteString("oe")
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
+	return lexdb.Normalize(word)
 }
 
 // LevenshteinSim returns a normalized similarity score in [0.0, 1.0].

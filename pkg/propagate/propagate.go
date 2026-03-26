@@ -6,9 +6,9 @@
 package propagate
 
 import (
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/morpheme"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // Result describes one sentiment propagation from source to target.

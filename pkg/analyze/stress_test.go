@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/analyze"
+	"github.com/kak/umcs/pkg/analyze"
 )
 
 func TestAnalyzeEmptyString(t *testing.T) {

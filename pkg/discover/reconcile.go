@@ -3,7 +3,7 @@ package discover
 import (
 	"strings"
 
-	"github.com/kak/lex-sentiment/pkg/seed"
+	"github.com/kak/umcs/pkg/seed"
 )
 
 // rootStemSuffixes are common Latin/PIE endings removed to find the stem.

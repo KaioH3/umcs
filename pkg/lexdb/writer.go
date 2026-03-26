@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kak/lex-sentiment/pkg/seed"
+	"github.com/kak/umcs/pkg/seed"
 )
 
 // Build reads seed roots and words, validates them, and writes a .lsdb binary file.
@@ -226,6 +226,8 @@ func validate(roots []seed.Root, words []seed.Word) error {
 			return fmt.Errorf("root %q parent_root_id %d not found", r.RootStr, r.ParentRootID)
 		}
 	}
+	wordIDSet := make(map[uint32]string, len(words))
+	normLangSet := make(map[string]string, len(words))
 	for _, w := range words {
 		if !rootSet[w.RootID] {
 			return fmt.Errorf("word %q references unknown root_id %d", w.Word, w.RootID)
@@ -233,6 +235,19 @@ func validate(roots []seed.Root, words []seed.Word) error {
 		if _, ok := ParseLang(w.Lang); !ok {
 			return fmt.Errorf("word %q has unknown lang %q", w.Word, w.Lang)
 		}
+		// Enforce word_id uniqueness — duplicate IDs cause silent data corruption.
+		if prev, exists := wordIDSet[w.WordID]; exists {
+			return fmt.Errorf("duplicate word_id %d: %q and %q", w.WordID, prev, w.Word)
+		}
+		wordIDSet[w.WordID] = w.Word
+		// Enforce (norm, lang) uniqueness — same normalized form in same language
+		// would make one word unreachable via LookupWord.
+		normKey := strings.ToLower(strings.TrimSpace(w.Norm)) + "_" + w.Lang
+		if prev, exists := normLangSet[normKey]; exists {
+			return fmt.Errorf("duplicate normalized form %q in lang %s: %q and %q",
+				w.Norm, w.Lang, prev, w.Word)
+		}
+		normLangSet[normKey] = w.Word
 	}
 	return nil
 }

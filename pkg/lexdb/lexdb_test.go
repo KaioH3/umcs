@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/seed"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/seed"
 )
 
 func buildTestLexicon(t *testing.T) (*lexdb.Lexicon, string) {
@@ -165,6 +165,121 @@ func TestNormalize(t *testing.T) {
 		if got != c.want {
 			t.Errorf("Normalize(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// TestNormalizeComprehensive verifies the expanded diacritic coverage including
+// characters from Czech, Polish, Turkish, Romanian, Icelandic, and Nordic scripts.
+func TestNormalizeComprehensive(t *testing.T) {
+	cases := []struct{ in, want string }{
+		// Previously missing cases
+		{"naïve", "naive"},         // French ï
+		{"über", "uber"},           // German ü (extra test)
+		{"André", "andre"},         // French é + capital
+		{"Ångström", "angstrom"},   // Swedish Å
+		{"café", "cafe"},           // French é
+		{"résumé", "resume"},       // French é
+		{"Čeština", "cestina"},     // Czech č
+		{"Ångström", "angstrom"},   // å → a
+		{"Søren", "soren"},         // Danish ø
+		{"Ołówek", "olowek"},       // Polish ł
+		{"Şeker", "seker"},         // Turkish ş (new)
+		{"Ţară", "tara"},           // Romanian ț (new)
+		{"Ðanish", "danish"},       // Icelandic ð → d (new)
+		{"þorn", "thorn"},          // Icelandic þ → th (new)
+		{"Æsop", "aesop"},          // Latin æ → ae
+		{"Œuvre", "oeuvre"},        // French œ → oe
+		// CJK must be preserved (not stripped)
+		{"愛", "愛"},
+		{"悲", "悲"},
+		// Arabic preserved (Unicode letter, not Latin)
+		{"حب", "حب"},
+	}
+	for _, c := range cases {
+		got := lexdb.Normalize(c.in)
+		if got != c.want {
+			t.Errorf("Normalize(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// TestBuildRejectsDuplicateWordID verifies that Build() returns an error
+// when two words have the same word_id (CRITICAL: silent corruption otherwise).
+func TestBuildRejectsDuplicateWordID(t *testing.T) {
+	dir := t.TempDir()
+	roots := []seed.Root{{RootID: 1, RootStr: "negat", Origin: "LATIN", MeaningEN: "deny"}}
+	words := []seed.Word{
+		{WordID: 4097, RootID: 1, Variant: 1, Word: "negative", Lang: "EN", Norm: "negative"},
+		{WordID: 4097, RootID: 1, Variant: 1, Word: "negativ", Lang: "DE", Norm: "negativ"}, // same word_id!
+	}
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "dup_id.lsdb"))
+	if err == nil {
+		t.Fatal("duplicate word_id must be rejected by Build()")
+	}
+}
+
+// TestBuildRejectsDuplicateNormLang verifies that Build() returns an error
+// when two words have the same normalized form in the same language.
+func TestBuildRejectsDuplicateNormLang(t *testing.T) {
+	dir := t.TempDir()
+	roots := []seed.Root{{RootID: 1, RootStr: "bon", Origin: "LATIN", MeaningEN: "good"}}
+	words := []seed.Word{
+		{WordID: 4097, RootID: 1, Variant: 1, Word: "cafe", Lang: "PT", Norm: "cafe"},
+		{WordID: 4098, RootID: 1, Variant: 2, Word: "café", Lang: "PT", Norm: "cafe"}, // same norm + lang!
+	}
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "dup_norm.lsdb"))
+	if err == nil {
+		t.Fatal("duplicate (norm, lang) pair must be rejected by Build()")
+	}
+}
+
+// TestLookupWordInLang verifies that lang-specific lookup disambiguates
+// homographs that share the same normalized form (e.g. "mais" PT vs FR).
+func TestLookupWordInLang(t *testing.T) {
+	dir := t.TempDir()
+	roots := []seed.Root{
+		{RootID: 1, RootStr: "neg", Origin: "LATIN", MeaningEN: "deny"},
+		{RootID: 2, RootStr: "bon", Origin: "LATIN", MeaningEN: "good"},
+	}
+	// "mais" means "but/more" in PT (root 1) and is the word for "corn" in FR (root 2)
+	// After normalize: both become "mais"
+	words := []seed.Word{
+		{WordID: 4097, RootID: 1, Variant: 1, Word: "mais", Lang: "PT", Norm: "mais", Sentiment: 0x00120180},
+		{WordID: 8193, RootID: 2, Variant: 1, Word: "maïs", Lang: "FR", Norm: "mais", Sentiment: 0x00130140},
+	}
+	_, err := lexdb.Build(roots, words, filepath.Join(dir, "lang.lsdb"))
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	lex, err := lexdb.Load(filepath.Join(dir, "lang.lsdb"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	// Lang-specific lookups must return the correct word
+	pt := lex.LookupWordInLang("mais", "PT")
+	if pt == nil {
+		t.Fatal("LookupWordInLang('mais', 'PT') returned nil")
+	}
+	if pt.WordID != 4097 {
+		t.Fatalf("PT 'mais': want word_id=4097, got %d", pt.WordID)
+	}
+
+	fr := lex.LookupWordInLang("maïs", "FR")
+	if fr == nil {
+		t.Fatal("LookupWordInLang('maïs', 'FR') returned nil")
+	}
+	if fr.WordID != 8193 {
+		t.Fatalf("FR 'maïs': want word_id=8193, got %d", fr.WordID)
+	}
+
+	// Any-language lookup returns first (lowest word_id) match
+	any := lex.LookupWord("mais")
+	if any == nil {
+		t.Fatal("LookupWord('mais') returned nil")
+	}
+	if any.WordID != 4097 {
+		t.Fatalf("any-language 'mais': want word_id=4097 (first), got %d", any.WordID)
 	}
 }
 

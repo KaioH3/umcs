@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kak/lex-sentiment/pkg/analyze"
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/morpheme"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
-	"github.com/kak/lex-sentiment/pkg/tokenizer"
+	"github.com/kak/umcs/pkg/analyze"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/sentiment"
+	"github.com/kak/umcs/pkg/tokenizer"
 )
 
 // Server holds the loaded lexicon and serves HTTP requests.
@@ -35,6 +35,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/stats", s.handleStats)
 	mux.HandleFunc("/lookup", s.handleLookup)
+	mux.HandleFunc("/lookup/batch", s.handleLookupBatch)
 	mux.HandleFunc("/cognates", s.handleCognates)
 	mux.HandleFunc("/etymo", s.handleEtymo)
 	mux.HandleFunc("/analyze", s.handleAnalyze)
@@ -66,10 +67,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, map[string]any{
-		"status": "ok",
-		"roots":  s.lex.Stats.RootCount,
-		"words":  s.lex.Stats.WordCount,
-		"langs":  strings.Join(s.lex.LangCoverage(s.lex.Stats.LangFlags), ","),
+		"status":   "ok",
+		"version":  fmt.Sprintf("%d", lexdb.Version),
+		"checksum": fmt.Sprintf("0x%08X", s.lex.Stats.Checksum),
+		"roots":    s.lex.Stats.RootCount,
+		"words":    s.lex.Stats.WordCount,
+		"langs":    strings.Join(s.lex.LangCoverage(s.lex.Stats.LangFlags), ","),
 	})
 }
 
@@ -110,7 +113,13 @@ func (s *Server) handleLookup(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, "missing ?word=", 400)
 		return
 	}
-	wr := s.lex.LookupWord(word)
+	lang := r.URL.Query().Get("lang")
+	var wr *lexdb.WordRecord
+	if lang != "" {
+		wr = s.lex.LookupWordInLang(word, strings.ToUpper(lang))
+	} else {
+		wr = s.lex.LookupWord(word)
+	}
 	if wr == nil {
 		httpErr(w, fmt.Sprintf("not found: %q", word), 404)
 		return
@@ -146,6 +155,60 @@ func (s *Server) handleLookup(w http.ResponseWriter, r *http.Request) {
 		resp["root_meaning"] = s.lex.RootMeaning(root)
 	}
 	jsonOK(w, resp)
+}
+
+// handleLookupBatch looks up up to 100 words in a single request.
+// Request: [{"word": "negative", "lang": "EN"}, ...]
+// Response: array at same index — null entry for words not found.
+func (s *Server) handleLookupBatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	var items []struct {
+		Word string `json:"word"`
+		Lang string `json:"lang"`
+	}
+	if err := json.Unmarshal(body, &items); err != nil {
+		httpErr(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(items) > 100 {
+		httpErr(w, "batch limit is 100 items", http.StatusBadRequest)
+		return
+	}
+
+	results := make([]any, len(items))
+	for i, item := range items {
+		var wr *lexdb.WordRecord
+		if item.Lang != "" {
+			wr = s.lex.LookupWordInLang(item.Word, strings.ToUpper(item.Lang))
+		} else {
+			wr = s.lex.LookupWord(item.Word)
+		}
+		if wr == nil {
+			results[i] = nil
+			continue
+		}
+		root := s.lex.LookupRoot(wr.RootID)
+		entry := map[string]any{
+			"word":    s.lex.WordStr(wr),
+			"word_id": wr.WordID,
+			"root_id": wr.RootID,
+			"lang":    lexdb.LangName(wr.Lang),
+		}
+		if root != nil {
+			entry["root"] = s.lex.RootStr(root)
+			entry["root_origin"] = s.lex.RootOrigin(root)
+		}
+		results[i] = entry
+	}
+	jsonOK(w, results)
 }
 
 func (s *Server) handleCognates(w http.ResponseWriter, r *http.Request) {
@@ -337,7 +400,26 @@ func (s *Server) handleRoots(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	jsonOK(w, map[string]any{"count": len(roots), "roots": roots})
+	total := len(roots)
+
+	// Pagination: ?offset=N&limit=N
+	offset := 0
+	if s := r.URL.Query().Get("offset"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	if offset > len(roots) {
+		offset = len(roots)
+	}
+	roots = roots[offset:]
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if lim, err := strconv.Atoi(limitStr); err == nil && lim > 0 && lim < len(roots) {
+			roots = roots[:lim]
+		}
+	}
+
+	jsonOK(w, map[string]any{"total": total, "count": len(roots), "roots": roots})
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -362,8 +444,7 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	// /root/{id}/words — morphological family grouped by language
 	if len(parts) == 2 && parts[1] == "words" {
-		cognates := s.lex.Cognates(root.FirstWordIdx) // FirstWordIdx is used as ref
-		// Use the first actual word_id for cognate lookup
+		var cognates []lexdb.WordRecord
 		if int(root.FirstWordIdx) < len(s.lex.Words) {
 			cognates = s.lex.Cognates(s.lex.Words[root.FirstWordIdx].WordID)
 		}

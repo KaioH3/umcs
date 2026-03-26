@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/morpheme"
-	"github.com/kak/lex-sentiment/pkg/seed"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/seed"
 )
 
 // --- Binary corruption ---

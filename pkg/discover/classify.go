@@ -3,8 +3,8 @@ package discover
 import (
 	"strings"
 
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // Score holds the sentiment classification result for a word.

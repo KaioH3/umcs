@@ -6,7 +6,7 @@ package tokenizer_test
 import (
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/tokenizer"
+	"github.com/kak/umcs/pkg/tokenizer"
 )
 
 func TestTokenizeEmpty(t *testing.T) {

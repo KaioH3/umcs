@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // ImportConfig extends Config with dump-specific settings.

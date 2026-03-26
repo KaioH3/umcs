@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/propagate"
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/propagate"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 func buildPropLex(t *testing.T, roots []seed.Root, words []seed.Word) *lexdb.Lexicon {

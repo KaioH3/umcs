@@ -3,8 +3,9 @@ package discover
 import (
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // ── IsCJK / hasCJK ───────────────────────────────────────────────────────────
@@ -78,6 +79,26 @@ func TestPhoneticNorm_CJK(t *testing.T) {
 	for _, c := range cases {
 		if got := PhoneticNorm(c.in); got != c.want {
 			t.Errorf("PhoneticNorm(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// TestPhoneticNormMatchesNormalize verifies that for non-CJK strings,
+// PhoneticNorm() and lexdb.Normalize() produce identical results.
+// This guards the invariant that a word accepted during discovery will
+// always be found by LookupWord() after building the lexicon.
+func TestPhoneticNormMatchesNormalize(t *testing.T) {
+	cases := []string{
+		"café", "naïve", "über", "André", "Ångström",
+		"Søren", "Ołówek", "Şeker", "Ţară", "Ðanish", "þorn",
+		"Æsop", "Œuvre", "straße", "negativo", "TERRÍVEL",
+		"résumé", "Čeština", "feliz", "amor", "NEGATIVE",
+	}
+	for _, s := range cases {
+		got := PhoneticNorm(s)
+		want := lexdb.Normalize(s)
+		if got != want {
+			t.Errorf("PhoneticNorm(%q)=%q != lexdb.Normalize(%q)=%q", s, got, s, want)
 		}
 	}
 }

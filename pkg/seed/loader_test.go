@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/seed"
+	"github.com/kak/umcs/pkg/seed"
 )
 
 func writeCSV(t *testing.T, name, content string) string {
@@ -198,5 +198,35 @@ func TestLoadRootsWithNotes(t *testing.T) {
 	}
 	if len(roots) != 1 {
 		t.Fatalf("want 1 root, got %d", len(roots))
+	}
+}
+
+func TestLoadWordsInvalidFreqRank(t *testing.T) {
+	csv := `word_id,root_id,variant,word,lang,norm,polarity,intensity,semantic_role,domain,freq_rank,flags
+4097,1,1,negative,EN,negative,NEGATIVE,MODERATE,EVALUATION,GENERAL,not_a_number,0`
+	path := writeCSV(t, "words.csv", csv)
+	_, err := seed.LoadWords(path)
+	if err == nil {
+		t.Fatal("invalid freq_rank should return error")
+	}
+}
+
+func TestLoadWordsInvalidFlags(t *testing.T) {
+	csv := `word_id,root_id,variant,word,lang,norm,polarity,intensity,semantic_role,domain,freq_rank,flags
+4097,1,1,negative,EN,negative,NEGATIVE,MODERATE,EVALUATION,GENERAL,100,bad_flag`
+	path := writeCSV(t, "words.csv", csv)
+	_, err := seed.LoadWords(path)
+	if err == nil {
+		t.Fatal("invalid flags should return error")
+	}
+}
+
+func TestLoadWordsInvalidRootID(t *testing.T) {
+	csv := `word_id,root_id,variant,word,lang,norm,polarity,intensity,semantic_role,domain,freq_rank,flags
+4097,not_a_number,1,negative,EN,negative,NEGATIVE,MODERATE,EVALUATION,GENERAL,100,0`
+	path := writeCSV(t, "words.csv", csv)
+	_, err := seed.LoadWords(path)
+	if err == nil {
+		t.Fatal("invalid root_id should return error")
 	}
 }

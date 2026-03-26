@@ -20,13 +20,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kak/lex-sentiment/pkg/analyze"
-	"github.com/kak/lex-sentiment/pkg/api"
-	"github.com/kak/lex-sentiment/pkg/discover"
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
-	"github.com/kak/lex-sentiment/pkg/tokenizer"
+	"github.com/kak/umcs/pkg/analyze"
+	"github.com/kak/umcs/pkg/api"
+	"github.com/kak/umcs/pkg/discover"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
+	"github.com/kak/umcs/pkg/tokenizer"
 )
 
 const defaultLexicon = "lexicon.lsdb"

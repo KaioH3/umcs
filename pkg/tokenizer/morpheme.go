@@ -31,8 +31,8 @@ package tokenizer
 import (
 	"strings"
 
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // MorphToken is a single output token from the morpheme tokenizer.

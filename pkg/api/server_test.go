@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kak/lex-sentiment/pkg/api"
-	"github.com/kak/lex-sentiment/pkg/lexdb"
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/api"
+	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 func buildAPILex(t *testing.T) *lexdb.Lexicon {
@@ -468,5 +468,236 @@ func TestEtymoEndpoint(t *testing.T) {
 	body := decodeJSON(t, rec)
 	if _, ok := body["etymology_chain"]; !ok {
 		t.Fatal("response must include etymology_chain field")
+	}
+}
+
+// ── New feature tests ─────────────────────────────────────────────────────────
+
+func TestHealthHasVersion(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "GET", "/health", "")
+
+	body := decodeJSON(t, rec)
+	if body["version"] == nil {
+		t.Fatal("/health must include 'version' field")
+	}
+	if body["checksum"] == nil {
+		t.Fatal("/health must include 'checksum' field")
+	}
+}
+
+func TestLookupWithDiacritic(t *testing.T) {
+	// Build lex with a word that has accent — "négativo" should find it via Normalize
+	lex := buildAPILex(t)
+	h := api.New(lex).Handler()
+
+	// "negative" is in the lex — "NEGATIVE" uppercase should also work via Normalize
+	rec := doRequest(h, "GET", "/lookup?word=NEGATIVE", "")
+	if rec.Code != 200 {
+		t.Fatalf("case-insensitive lookup: want 200, got %d", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	if body["word_id"].(float64) != 4097 {
+		t.Fatalf("want word_id=4097, got %v", body["word_id"])
+	}
+}
+
+func TestLookupWithLang(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+
+	// "negativo" is PT in the test lex
+	rec := doRequest(h, "GET", "/lookup?word=negativo&lang=PT", "")
+	if rec.Code != 200 {
+		t.Fatalf("lang-specific lookup: want 200, got %d", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	if body["lang"] != "PT" {
+		t.Fatalf("want lang=PT, got %v", body["lang"])
+	}
+}
+
+func TestRootsPaginationLimit(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+
+	rec := doRequest(h, "GET", "/roots?limit=2", "")
+	if rec.Code != 200 {
+		t.Fatalf("want 200, got %d", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	roots, ok := body["roots"].([]any)
+	if !ok {
+		t.Fatal("roots should be an array")
+	}
+	if len(roots) > 2 {
+		t.Fatalf("limit=2: want at most 2 roots, got %d", len(roots))
+	}
+	// total should reflect full count, count is paginated
+	if body["total"] == nil {
+		t.Fatal("response must include 'total' field")
+	}
+}
+
+func TestRootsPaginationOffset(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+
+	all := doRequest(h, "GET", "/roots", "")
+	paged := doRequest(h, "GET", "/roots?offset=1&limit=100", "")
+
+	allBody := decodeJSON(t, all)
+	pagedBody := decodeJSON(t, paged)
+
+	allRoots := allBody["roots"].([]any)
+	pagedRoots := pagedBody["roots"].([]any)
+
+	// total must be same
+	if allBody["total"].(float64) != pagedBody["total"].(float64) {
+		t.Fatalf("total should be same regardless of pagination: %v vs %v",
+			allBody["total"], pagedBody["total"])
+	}
+	// paginated slice should be one shorter
+	if len(pagedRoots) != len(allRoots)-1 {
+		t.Fatalf("offset=1 should skip first root: want %d, got %d", len(allRoots)-1, len(pagedRoots))
+	}
+}
+
+func TestLookupBatch(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+
+	body := `[{"word":"negative","lang":"EN"},{"word":"xyzzy_notfound"},{"word":"good"}]`
+	rec := doRequest(h, "POST", "/lookup/batch", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("want 200, got %d (body=%s)", rec.Code, rec.Body.String())
+	}
+
+	var results []any
+	if err := json.Unmarshal(rec.Body.Bytes(), &results); err != nil {
+		t.Fatalf("decode JSON: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("want 3 results, got %d", len(results))
+	}
+	// first: negative found
+	if results[0] == nil {
+		t.Fatal("results[0] (negative) should not be null")
+	}
+	// second: not found → null
+	if results[1] != nil {
+		t.Fatalf("results[1] (xyzzy) should be null, got %v", results[1])
+	}
+	// third: good found
+	if results[2] == nil {
+		t.Fatal("results[2] (good) should not be null")
+	}
+}
+
+func TestLookupBatchMethodNotAllowed(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "GET", "/lookup/batch", "")
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("want 405, got %d", rec.Code)
+	}
+}
+
+func TestLookupBatchLimitExceeded(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i := range 101 {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(`{"word":"test"}`)
+	}
+	sb.WriteString("]")
+	rec := doRequest(h, "POST", "/lookup/batch", sb.String())
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("want 400 for batch > 100, got %d", rec.Code)
+	}
+}
+
+func TestBatchEmptyArray(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "POST", "/analyze/batch", "[]")
+	if rec.Code != 200 {
+		t.Fatalf("empty batch: want 200, got %d", rec.Code)
+	}
+	var results []any
+	if err := json.Unmarshal(rec.Body.Bytes(), &results); err != nil {
+		t.Fatalf("decode JSON: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("empty batch: want 0 results, got %d", len(results))
+	}
+}
+
+func TestBatchEmptyTextItem(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	rec := doRequest(h, "POST", "/analyze/batch", `[{"text":""}]`)
+	if rec.Code != 200 {
+		t.Fatalf("batch with empty text: want 200, got %d", rec.Code)
+	}
+	var results []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &results); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("want 1 result, got %d", len(results))
+	}
+	if results[0]["verdict"] != "NEUTRAL" {
+		t.Fatalf("empty text → NEUTRAL, got %v", results[0]["verdict"])
+	}
+}
+
+func TestAnalyzeSentimentCorrect(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+	// "not terrible" → negation inverts NEGATIVE → positive score → POSITIVE
+	rec := doRequest(h, "POST", "/analyze", "not terrible")
+	if rec.Code != 200 {
+		t.Fatalf("want 200, got %d", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	if body["verdict"] != "POSITIVE" {
+		t.Fatalf("'not terrible' should be POSITIVE, got %v (score=%v)", body["verdict"], body["score"])
+	}
+}
+
+// TestServerSmoke exercises every endpoint in sequence to catch integration failures.
+func TestServerSmoke(t *testing.T) {
+	h := api.New(buildAPILex(t)).Handler()
+
+	endpoints := []struct {
+		method string
+		url    string
+		body   string
+		want   int
+	}{
+		{"GET", "/health", "", 200},
+		{"GET", "/stats", "", 200},
+		{"GET", "/lookup?word=negative", "", 200},
+		{"GET", "/lookup?word=negative&lang=EN", "", 200},
+		{"GET", "/cognates?word=negative", "", 200},
+		{"GET", "/etymo?word=negative", "", 200},
+		{"POST", "/analyze", "not terrible", 200},
+		{"GET", "/analyze?text=good", "", 200},
+		{"POST", "/analyze/batch", `[{"text":"good"},{"text":"terrible"}]`, 200},
+		{"POST", "/tokenize", "negative negativo", 200},
+		{"GET", "/vocab", "", 200},
+		{"GET", "/roots", "", 200},
+		{"GET", "/roots?productive=true", "", 200},
+		{"GET", "/roots?limit=2&offset=0", "", 200},
+		{"GET", "/root/1", "", 200},
+		{"GET", "/root/1/words", "", 200},
+		{"GET", "/sentiment/decode?s=0x80", "", 200},
+		{"POST", "/lookup/batch", `[{"word":"negative"}]`, 200},
+	}
+
+	for _, tc := range endpoints {
+		t.Run(tc.method+" "+tc.url, func(t *testing.T) {
+			rec := doRequest(h, tc.method, tc.url, tc.body)
+			if rec.Code != tc.want {
+				t.Fatalf("want %d, got %d (body=%s)", tc.want, rec.Code, rec.Body.String())
+			}
+		})
 	}
 }

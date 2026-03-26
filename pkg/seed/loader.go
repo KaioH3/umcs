@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kak/lex-sentiment/pkg/morpheme"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // Root holds a parsed root record from roots.csv.
@@ -135,8 +135,17 @@ func LoadWords(path string) ([]Word, error) {
 		if err != nil {
 			return nil, fmt.Errorf("words.csv line %d: variant: %w", lineNum, err)
 		}
-		freqRank, _ := parseUint32(col(row, idx, "freq_rank"))
-		flags, _ := parseUint32(col(row, idx, "flags"))
+		var freqRank, flags uint32
+		if s := col(row, idx, "freq_rank"); s != "" {
+			if freqRank, err = parseUint32(s); err != nil {
+				return nil, fmt.Errorf("words.csv line %d: freq_rank: %w", lineNum, err)
+			}
+		}
+		if s := col(row, idx, "flags"); s != "" {
+			if flags, err = parseUint32(s); err != nil {
+				return nil, fmt.Errorf("words.csv line %d: flags: %w", lineNum, err)
+			}
+		}
 
 		// Validate ID consistency
 		if err := morpheme.Validate(wordID, rootID, variant); err != nil {

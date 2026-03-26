@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kak/lex-sentiment/pkg/morpheme"
-	"github.com/kak/lex-sentiment/pkg/seed"
-	"github.com/kak/lex-sentiment/pkg/sentiment"
+	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/seed"
+	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // Config controls a discovery run.
@@ -324,6 +324,9 @@ func makeWord(rootID uint32, word, lang, norm string, score Score, allWords []se
 	variant := NextVariant(rootID, allWords)
 	wordID, err := morpheme.MakeWordID(rootID, variant)
 	if err != nil {
+		// variant > 4095 (MaxVariant) — root has too many words. Log and skip.
+		fmt.Fprintf(os.Stderr, "warning: variant overflow root_id=%d variant=%d word=%q dropped\n",
+			rootID, variant, word)
 		return seed.Word{}, false
 	}
 	pol := score.Polarity

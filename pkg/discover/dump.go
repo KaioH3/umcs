@@ -3,10 +3,15 @@ package discover
 import (
 	"compress/bzip2"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 )
+
+// maxXMLErrors is the maximum number of consecutive XML decode errors before
+// ScanDump aborts and returns an error (indicates a corrupted dump file).
+const maxXMLErrors = 1000
 
 // WikiPage is a single page from a Wiktionary XML dump.
 type WikiPage struct {
@@ -37,11 +42,12 @@ func ScanDump(path string, fn func(WikiPage) error) error {
 
 	// Streaming state: track which element we're inside.
 	var (
-		inPage  bool
-		ns      string
-		title   strings.Builder
-		text    strings.Builder
-		current string // "title" | "ns" | "text" | ""
+		inPage        bool
+		ns            string
+		title         strings.Builder
+		text          strings.Builder
+		current       string // "title" | "ns" | "text" | ""
+		xmlErrCount   int
 	)
 
 	for {
@@ -50,9 +56,14 @@ func ScanDump(path string, fn func(WikiPage) error) error {
 			break
 		}
 		if err != nil {
-			// Skip malformed XML tokens common in large wiki dumps.
+			xmlErrCount++
+			fmt.Fprintf(os.Stderr, "warning: XML decode error in dump (error #%d): %v\n", xmlErrCount, err)
+			if xmlErrCount >= maxXMLErrors {
+				return fmt.Errorf("dump appears corrupt: %d consecutive XML errors; last: %w", xmlErrCount, err)
+			}
 			continue
 		}
+		xmlErrCount = 0 // reset on successful token
 
 		switch t := tok.(type) {
 		case xml.StartElement:

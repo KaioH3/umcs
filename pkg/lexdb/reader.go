@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/kak/lex-sentiment/pkg/morpheme"
+	"github.com/kak/umcs/pkg/morpheme"
 )
 
 // Lexicon holds the fully loaded lexicon in memory.
@@ -160,12 +160,25 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 }
 
 // buildIndex constructs the normalized-form → word index for O(1) lookups.
+//
+// Collision policy: keep-first (lowest word_id wins for any-language lookups).
+// Words are sorted by word_id during Build, so the first occurrence encountered
+// here is always the one with the lowest word_id.
+//
+// Lang-specific keys use the format "norm_LANGID" (e.g. "mais_0" for PT) to
+// allow LookupWordInLang to disambiguate homographs across languages.
 func (l *Lexicon) buildIndex() {
-	l.wordIndex = make(map[string]int, len(l.Words))
+	l.wordIndex = make(map[string]int, len(l.Words)*2)
 	for i, w := range l.Words {
 		norm := l.str(w.NormOffset)
-		l.wordIndex[norm] = i
-		// Also index by surface form (lowercased) if different from norm
+		// Any-language lookup: keep the first (lowest word_id) match only.
+		if _, exists := l.wordIndex[norm]; !exists {
+			l.wordIndex[norm] = i
+		}
+		// Lang-specific key: always stored (one entry per norm+lang pair).
+		langKey := fmt.Sprintf("%s_%d", norm, w.Lang)
+		l.wordIndex[langKey] = i
+		// Also index by lowercased surface form if it differs from norm.
 		surface := strings.ToLower(l.str(w.WordOffset))
 		if surface != norm {
 			if _, exists := l.wordIndex[surface]; !exists {
@@ -189,28 +202,79 @@ func (l *Lexicon) str(offset uint32) string {
 	return string(l.Heap[start:end])
 }
 
-// Normalize strips diacritics, lowercases, and trims a word for lookup.
+// Normalize is the canonical diacritic-stripping function for the UMCS lexicon.
+//
+// It lowercases, trims, and maps accented characters to their ASCII base form,
+// preserving the semantic identity of a word across orthographic variants
+// (e.g. "café" = "cafe", "naïve" = "naive", "über" = "uber").
+//
+// Non-Latin scripts (Arabic, Cyrillic, CJK, Hangul, Hebrew) are preserved
+// unchanged — only Latin-script diacritics are stripped. CJK ideograms are
+// each their own morpheme and must never be collapsed.
+//
+// This function is used by LookupWord and by the Build pipeline, so changing
+// it changes the norm stored in .lsdb files — rebuild required after any change.
 func Normalize(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
 		switch r {
-		case 'á', 'à', 'â', 'ã', 'ä', 'å':
+		// ── Vowel a ────────────────────────────────────────────────────────────
+		case 'á', 'à', 'â', 'ã', 'ä', 'å', 'ā', 'ă', 'ą':
 			b.WriteByte('a')
-		case 'é', 'è', 'ê', 'ë':
+		// ── Vowel e ────────────────────────────────────────────────────────────
+		case 'é', 'è', 'ê', 'ë', 'ē', 'ě', 'ę':
 			b.WriteByte('e')
-		case 'í', 'ì', 'î', 'ï':
+		// ── Vowel i ────────────────────────────────────────────────────────────
+		case 'í', 'ì', 'î', 'ï', 'ī', 'ĭ', 'į':
 			b.WriteByte('i')
-		case 'ó', 'ò', 'ô', 'õ', 'ö':
+		// ── Vowel o ────────────────────────────────────────────────────────────
+		case 'ó', 'ò', 'ô', 'õ', 'ö', 'ō', 'ő', 'ø':
 			b.WriteByte('o')
-		case 'ú', 'ù', 'û', 'ü':
+		// ── Vowel u ────────────────────────────────────────────────────────────
+		case 'ú', 'ù', 'û', 'ü', 'ū', 'ű', 'ů':
 			b.WriteByte('u')
-		case 'ç':
+		// ── Vowel y ────────────────────────────────────────────────────────────
+		case 'ý', 'ÿ':
+			b.WriteByte('y')
+		// ── Consonant c ────────────────────────────────────────────────────────
+		case 'ç', 'ć', 'č':
 			b.WriteByte('c')
-		case 'ñ':
+		// ── Consonant n ────────────────────────────────────────────────────────
+		case 'ñ', 'ń', 'ň':
 			b.WriteByte('n')
+		// ── Consonant s ────────────────────────────────────────────────────────
+		case 'š', 'ś', 'ş':
+			b.WriteByte('s')
+		// ── Consonant z ────────────────────────────────────────────────────────
+		case 'ž', 'ź', 'ż':
+			b.WriteByte('z')
+		// ── Consonant d ────────────────────────────────────────────────────────
+		case 'đ', 'ð':
+			b.WriteByte('d')
+		// ── Consonant t ────────────────────────────────────────────────────────
+		case 'ț', 'ţ': // U+021B (comma below) and U+0163 (cedilla) — both Romanian
+			b.WriteByte('t')
+		// ── Consonant l ────────────────────────────────────────────────────────
+		case 'ł':
+			b.WriteByte('l')
+		// ── Consonant r ────────────────────────────────────────────────────────
+		case 'ř':
+			b.WriteByte('r')
+		// ── Consonant g ────────────────────────────────────────────────────────
+		case 'ğ':
+			b.WriteByte('g')
+		// ── Multi-char expansions ──────────────────────────────────────────────
 		case 'ß':
 			b.WriteString("ss")
+		case 'þ':
+			b.WriteString("th")
+		case 'æ':
+			b.WriteString("ae")
+		case 'œ':
+			b.WriteString("oe")
 		default:
+			// Preserve: letters (non-Latin scripts, CJK, Cyrillic, Arabic, etc.),
+			// digits, and hyphens. Strip punctuation and whitespace.
 			if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' {
 				b.WriteRune(r)
 			}
@@ -220,6 +284,8 @@ func Normalize(s string) string {
 }
 
 // LookupWord finds a word record by surface form (normalized internally).
+// When multiple languages share the same normalized form, the word with the
+// lowest word_id is returned. Use LookupWordInLang for language-specific lookup.
 // Returns nil if not found.
 func (l *Lexicon) LookupWord(word string) *WordRecord {
 	norm := Normalize(word)
@@ -228,6 +294,22 @@ func (l *Lexicon) LookupWord(word string) *WordRecord {
 		return nil
 	}
 	return &l.Words[idx]
+}
+
+// LookupWordInLang finds a word by surface form in a specific language.
+// This disambiguates homographs across languages (e.g. "mais" PT vs "maïs" FR).
+// Falls back to LookupWord if the language is unknown or no lang-specific match exists.
+func (l *Lexicon) LookupWordInLang(word, lang string) *WordRecord {
+	langID, ok := ParseLang(strings.ToUpper(lang))
+	if !ok {
+		return l.LookupWord(word)
+	}
+	norm := Normalize(word)
+	key := fmt.Sprintf("%s_%d", norm, langID)
+	if idx, ok := l.wordIndex[key]; ok {
+		return &l.Words[idx]
+	}
+	return l.LookupWord(word) // fallback: any language
 }
 
 // LookupRoot finds a root record by root_id using binary search (O(log N)).

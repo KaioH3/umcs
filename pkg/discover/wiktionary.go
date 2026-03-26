@@ -108,7 +108,7 @@ func Fetch(word, lang string) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "LexSent/1.0 (morpheme discovery; https://github.com/kak/lex-sentiment)")
+	req.Header.Set("User-Agent", "UMCS/1.0 (morpheme discovery; https://github.com/KaioH3/umcs)")
 
 	resp, err := wiktClient.Do(req)
 	if err != nil {

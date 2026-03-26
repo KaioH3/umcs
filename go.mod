@@ -1,3 +1,3 @@
-module github.com/kak/lex-sentiment
+module github.com/kak/umcs
 
 go 1.24.1
