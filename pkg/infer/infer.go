@@ -14,7 +14,9 @@ package infer
 
 import (
 	"strings"
+	"unicode"
 
+	"github.com/kak/umcs/pkg/phon"
 	"github.com/kak/umcs/pkg/sentiment"
 )
 
@@ -111,6 +113,9 @@ func POSFromShape(word, lang string) uint32 {
 func IsAbstractFromShape(word, lang string) bool {
 	lower := strings.ToLower(word)
 	for _, suf := range abstractSuffixes[lang] {
+		if strings.HasPrefix(suf, "-") {
+			suf = suf[1:]
+		}
 		if strings.HasSuffix(lower, suf) {
 			return true
 		}
@@ -151,4 +156,155 @@ func FillMissing(sent uint32, word, lang string) uint32 {
 	// (Most words are abstract-unset; inference here would have too many false positives)
 
 	return sent
+}
+
+// SyllablesFromShape counts approximate syllables by counting vowel groups.
+// This is a coarse heuristic, not a proper syllabification algorithm.
+// Returns 0 for empty or all-consonant words. Counts are clamped to [0, 15].
+//
+// Vowel nuclei are sequences of vowel letters (including diacritics mapped to
+// their base). Final silent 'e' in English is not special-cased here because
+// we operate on normalized (diacritic-stripped) forms.
+func SyllablesFromShape(word, lang string) uint32 {
+	if word == "" {
+		return 0
+	}
+	lower := strings.ToLower(word)
+	var count uint32
+	inVowel := false
+	for _, r := range lower {
+		if isVowel(r) {
+			if !inVowel {
+				count++
+				inVowel = true
+			}
+		} else {
+			inVowel = false
+		}
+	}
+	// English heuristic: subtract 1 for silent final 'e' (e.g. "love", "hate").
+	// Only when the word ends in 'e' preceded by a consonant and count > 1.
+	if lang == "EN" && count > 1 {
+		runes := []rune(lower)
+		n := len(runes)
+		if n >= 3 && runes[n-1] == 'e' && !isVowel(runes[n-2]) && isVowel(runes[n-3]) {
+			count--
+		}
+	}
+	if count > 15 {
+		count = 15
+	}
+	return count
+}
+
+// isVowel reports whether r is a vowel letter (basic Latin; accented forms are
+// normalized before reaching here in most callers).
+func isVowel(r rune) bool {
+	if !unicode.IsLetter(r) {
+		return false
+	}
+	switch r {
+	case 'a', 'e', 'i', 'o', 'u',
+		'á', 'à', 'â', 'ã', 'ä', 'å',
+		'é', 'è', 'ê', 'ë',
+		'í', 'ì', 'î', 'ï',
+		'ó', 'ò', 'ô', 'õ', 'ö',
+		'ú', 'ù', 'û', 'ü',
+		'ý', 'ÿ':
+		return true
+	}
+	return false
+}
+
+// stressSuffixes maps (lang, suffix) → stress pattern following documented phonology.
+// Sources: Portuguese: Bisol (2013); Spanish: Harris (1983); French: Tranel (1987).
+var stressSuffixRules = []struct {
+	lang   string
+	suffix string
+	stress uint32
+}{
+	// Portuguese: oxytone suffixes (stressed on final syllable).
+	{"PT", "ção", phon.StressFinal},
+	{"PT", "são", phon.StressFinal},
+	{"PT", "or", phon.StressFinal},
+	{"PT", "ez", phon.StressFinal},
+	{"PT", "il", phon.StressFinal},
+	{"PT", "az", phon.StressFinal},
+	// Spanish: paroxytone is default; mark exceptions.
+	{"ES", "ción", phon.StressFinal},
+	{"ES", "sión", phon.StressFinal},
+	{"ES", "or", phon.StressFinal},
+	// English: no fixed rule; primary patterns annotated in data.
+	{"EN", "tion", phon.StressFinal},   // ac-TION
+	{"EN", "sion", phon.StressFinal},   // ten-SION
+	// French: always final (fixed stress).
+	{"FR", "", phon.StressFinal}, // catch-all for FR
+	// Turkish: always final (fixed stress).
+	{"TR", "", phon.StressFinal},
+	// German: initial stress for most native words.
+	{"DE", "", phon.StressPenultimate}, // approximation; many exceptions
+}
+
+// defaultStress returns the most common stress pattern for a language.
+// Based on typological frequency data (Gussenhoven & Jacobs, 2011).
+var defaultStress = map[string]uint32{
+	"PT": phon.StressPenultimate,  // paroxytone is most common
+	"ES": phon.StressPenultimate,
+	"IT": phon.StressPenultimate,
+	"FR": phon.StressFinal,        // fixed final stress
+	"TR": phon.StressFinal,        // fixed final stress
+	"EN": phon.StressPenultimate,  // most common in English
+	"DE": phon.StressPenultimate,  // most lexical words
+	"NL": phon.StressPenultimate,
+	"PL": phon.StressPenultimate,
+}
+
+// StressFromShape infers the stress pattern from language defaults and suffix patterns.
+// This is a statistical heuristic, not a full phonological parser.
+func StressFromShape(word, lang string) uint32 {
+	lower := strings.ToLower(word)
+	// Check suffix rules (longest match wins).
+	var best uint32
+	var bestLen int
+	for _, rule := range stressSuffixRules {
+		if rule.lang != lang {
+			continue
+		}
+		if rule.suffix == "" {
+			// Language-level default; only use if no suffix matched.
+			if bestLen == 0 {
+				best = rule.stress
+			}
+			continue
+		}
+		if strings.HasSuffix(lower, rule.suffix) && len(rule.suffix) > bestLen {
+			best = rule.stress
+			bestLen = len(rule.suffix)
+		}
+	}
+	if best != 0 {
+		return best
+	}
+	// Fall back to language default.
+	if def, ok := defaultStress[lang]; ok {
+		return def
+	}
+	return phon.StressUnknown
+}
+
+// FillPhonology fills missing phonology bits (syllables, stress) in flags using
+// word-shape heuristics. It does NOT overwrite non-zero values.
+// Called during seed loading after explicit CSV values are parsed.
+func FillPhonology(flags uint32, word, lang string) uint32 {
+	if phon.Syllables(flags) == 0 {
+		if n := SyllablesFromShape(word, lang); n > 0 {
+			flags = phon.SetSyllables(flags, n)
+		}
+	}
+	if phon.Stress(flags) == 0 {
+		if s := StressFromShape(word, lang); s != 0 {
+			flags = phon.SetStress(flags, s)
+		}
+	}
+	return flags
 }

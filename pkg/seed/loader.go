@@ -10,31 +10,37 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kak/umcs/pkg/infer"
 	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/phon"
 	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // Root holds a parsed root record from roots.csv.
 type Root struct {
-	RootID       uint32
-	RootStr      string // e.g. "negat"
-	Origin       string // e.g. "LATIN", "PROTO_GERMANIC"
-	MeaningEN    string // e.g. "to deny or negate"
-	Notes        string
-	ParentRootID uint32 // 0 if no parent (etymological link)
+	RootID         uint32
+	RootStr        string // e.g. "negat"
+	Origin         string // e.g. "LATIN", "PROTO_GERMANIC"
+	MeaningEN      string // e.g. "to deny or negate"
+	Notes          string
+	ParentRootID   uint32 // 0 if no parent (etymological link)
+	HypernymRootID uint32 // WordNet-style is-a parent (0 = none)
+	AntonymRootID  uint32 // primary antonym root (0 = none)
+	SynonymRootID  uint32 // nearest synonym root (0 = none)
 }
 
 // Word holds a parsed word record from words.csv.
 type Word struct {
-	WordID    uint32
-	RootID    uint32
-	Variant   uint32
-	Word      string // actual surface form, may contain diacritics
-	Lang      string // PT, EN, ES, IT, DE
-	Norm      string // ASCII-normalized form for hashing
-	Sentiment uint32 // packed bitmask
-	FreqRank  uint32
-	Flags     uint32
+	WordID      uint32
+	RootID      uint32
+	Variant     uint32
+	Word        string // actual surface form, may contain diacritics
+	Lang        string // PT, EN, ES, IT, DE, FR, ...
+	Norm        string // ASCII-normalized form for hashing
+	Sentiment   uint32 // packed bitmask
+	FreqRank    uint32
+	Flags       uint32 // low bits: register/onto/polysemy/cultural; high bits: phonology
+	Pron        string // IPA pronunciation string (may be empty)
 }
 
 // LoadRoots reads roots.csv and returns all root records.
@@ -72,21 +78,42 @@ func LoadRoots(path string) ([]Root, error) {
 			return nil, fmt.Errorf("roots.csv line %d: root_id: %w", lineNum, err)
 		}
 
-		var parentID uint32
+		var parentID, hypernymID, antonymID, synonymID uint32
 		if p := col(row, idx, "parent_root_id"); p != "" {
 			parentID, err = parseUint32(p)
 			if err != nil {
 				return nil, fmt.Errorf("roots.csv line %d: parent_root_id: %w", lineNum, err)
 			}
 		}
+		if p := col(row, idx, "hypernym_root_id"); p != "" {
+			hypernymID, err = parseUint32(p)
+			if err != nil {
+				return nil, fmt.Errorf("roots.csv line %d: hypernym_root_id: %w", lineNum, err)
+			}
+		}
+		if p := col(row, idx, "antonym_root_id"); p != "" {
+			antonymID, err = parseUint32(p)
+			if err != nil {
+				return nil, fmt.Errorf("roots.csv line %d: antonym_root_id: %w", lineNum, err)
+			}
+		}
+		if p := col(row, idx, "synonym_root_id"); p != "" {
+			synonymID, err = parseUint32(p)
+			if err != nil {
+				return nil, fmt.Errorf("roots.csv line %d: synonym_root_id: %w", lineNum, err)
+			}
+		}
 
 		roots = append(roots, Root{
-			RootID:       rootID,
-			RootStr:      strings.TrimSpace(col(row, idx, "root_str")),
-			Origin:       strings.TrimSpace(col(row, idx, "origin")),
-			MeaningEN:    strings.TrimSpace(col(row, idx, "meaning_en")),
-			Notes:        strings.TrimSpace(col(row, idx, "notes")),
-			ParentRootID: parentID,
+			RootID:         rootID,
+			RootStr:        strings.TrimSpace(col(row, idx, "root_str")),
+			Origin:         strings.TrimSpace(col(row, idx, "origin")),
+			MeaningEN:      strings.TrimSpace(col(row, idx, "meaning_en")),
+			Notes:          strings.TrimSpace(col(row, idx, "notes")),
+			ParentRootID:   parentID,
+			HypernymRootID: hypernymID,
+			AntonymRootID:  antonymID,
+			SynonymRootID:  synonymID,
 		})
 	}
 	return roots, nil
@@ -104,6 +131,7 @@ func LoadWords(path string) ([]Word, error) {
 
 	r := csv.NewReader(f)
 	r.TrimLeadingSpace = true
+	r.FieldsPerRecord = -1 // allow rows with fewer fields than header (new columns)
 
 	header, err := r.Read()
 	if err != nil {
@@ -211,16 +239,61 @@ func LoadWords(path string) ([]Word, error) {
 			flags |= 1 << 20
 		}
 
+		// Phonology bits (packed into high bits of flags).
+		if syl := col(row, idx, "syllables"); syl != "" {
+			n, err := parseUint32(syl)
+			if err != nil {
+				return nil, fmt.Errorf("words.csv line %d: syllables: %w", lineNum, err)
+			}
+			flags = phon.SetSyllables(flags, n)
+		}
+		if str := col(row, idx, "stress"); str != "" {
+			s, err := parseStress(str)
+			if err != nil {
+				return nil, fmt.Errorf("words.csv line %d: stress: %w", lineNum, err)
+			}
+			flags = phon.SetStress(flags, s)
+		}
+		if val := col(row, idx, "valency"); val != "" {
+			v, err := parseValency(val)
+			if err != nil {
+				return nil, fmt.Errorf("words.csv line %d: valency: %w", lineNum, err)
+			}
+			flags = phon.SetValency(flags, v)
+		}
+		if col(row, idx, "irony_capable") == "1" || strings.ToUpper(col(row, idx, "irony_capable")) == "TRUE" {
+			flags |= phon.IronyCapable
+		}
+		if col(row, idx, "neologism") == "1" || strings.ToUpper(col(row, idx, "neologism")) == "TRUE" {
+			flags |= phon.Neologism
+		}
+
+		wordStr := strings.TrimSpace(col(row, idx, "word"))
+		langStr := strings.TrimSpace(col(row, idx, "lang"))
+
+		// Morphological inference: fill missing POS from suffix patterns.
+		// Never overwrites an explicitly annotated POS.
+		if sentiment.POS(sent) == 0 {
+			sent = infer.FillMissing(sent, wordStr, langStr)
+		}
+
+		// Phonological inference: fill missing syllable count and stress from word shape.
+		// Never overwrites explicitly annotated values.
+		flags = infer.FillPhonology(flags, wordStr, langStr)
+
+		pronStr := strings.TrimSpace(col(row, idx, "pron"))
+
 		words = append(words, Word{
 			WordID:    wordID,
 			RootID:    rootID,
 			Variant:   variant,
-			Word:      strings.TrimSpace(col(row, idx, "word")),
-			Lang:      strings.TrimSpace(col(row, idx, "lang")),
+			Word:      wordStr,
+			Lang:      langStr,
 			Norm:      strings.TrimSpace(col(row, idx, "norm")),
 			Sentiment: sent,
 			FreqRank:  freqRank,
 			Flags:     flags,
+			Pron:      pronStr,
 		})
 	}
 	return words, nil
@@ -302,6 +375,38 @@ func parseOntological(s string) (uint32, error) {
 		return 13 << 12, nil
 	}
 	return 0, fmt.Errorf("unknown ontological %q", s)
+}
+
+func parseStress(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "UNKNOWN", "NONE":
+		return phon.StressUnknown, nil
+	case "FINAL", "OXYTONE":
+		return phon.StressFinal, nil
+	case "PENULTIMATE", "PAROXYTONE":
+		return phon.StressPenultimate, nil
+	case "ANTEPENULTIMATE", "PROPAROXYTONE":
+		return phon.StressAntepenultimate, nil
+	}
+	return 0, fmt.Errorf("unknown stress %q (valid: FINAL, PENULTIMATE, ANTEPENULTIMATE)", s)
+}
+
+func parseValency(s string) (uint32, error) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "", "NA", "N/A", "NONE":
+		return phon.ValencyNA, nil
+	case "INTRANS", "INTRANSITIVE":
+		return phon.ValencyIntrans, nil
+	case "TRANS", "TRANSITIVE":
+		return phon.ValencyTrans, nil
+	case "DITRANS", "DITRANSITIVE":
+		return phon.ValencyDitrans, nil
+	case "COPULAR", "COPULA":
+		return phon.ValencyCopular, nil
+	case "MODAL":
+		return phon.ValencyModal, nil
+	}
+	return 0, fmt.Errorf("unknown valency %q (valid: INTRANS, TRANS, DITRANS, COPULAR, MODAL)", s)
 }
 
 func parseUint32(s string) (uint32, error) {

@@ -32,17 +32,19 @@ import (
 	"strings"
 
 	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/morpheme"
 	"github.com/kak/umcs/pkg/sentiment"
 )
 
 // MorphToken is a single output token from the morpheme tokenizer.
 type MorphToken struct {
-	Surface   string // original word form
-	WordID    uint32 // 0 if unknown (OOV)
-	RootID    uint32 // root family ID (cross-linguistic key)
-	Sentiment uint32 // packed bitmask — pre-encoded semantic info
-	Lang      string // source language
-	Known     bool   // false for OOV words
+	Surface   string              // original word form
+	WordID    uint32              // 0 if unknown (OOV)
+	RootID    uint32              // root family ID (cross-linguistic key)
+	Sentiment uint32              // packed bitmask — pre-encoded semantic info
+	Lang      string              // source language
+	Known     bool                // false for OOV words
+	Token64   morpheme.Token64    // packed uint64: word_id (upper) + semantic payload (lower)
 }
 
 // SentimentSummary decodes the packed sentiment bitmask for human display.
@@ -68,6 +70,7 @@ func Tokenize(lex *lexdb.Lexicon, text string) []MorphToken {
 			t.Sentiment = wr.Sentiment
 			t.Lang = lexdb.LangName(wr.Lang)
 			t.Known = true
+			t.Token64 = morpheme.Pack64(wr.WordID, wr.Sentiment, wr.Flags)
 		}
 		tokens = append(tokens, t)
 	}

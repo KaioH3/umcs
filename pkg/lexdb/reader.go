@@ -72,8 +72,8 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 		return nil, fmt.Errorf("invalid magic 0x%08X (want 0x%08X)", magic, Magic)
 	}
 	version := readU32()
-	if version != Version {
-		return nil, fmt.Errorf("unsupported version %d", version)
+	if version != 1 && version != Version {
+		return nil, fmt.Errorf("unsupported version %d (supported: 1, %d)", version, Version)
 	}
 	rootCount := readU32()
 	wordCount := readU32()
@@ -95,9 +95,17 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 		return nil, fmt.Errorf("checksum mismatch: got 0x%08X, want 0x%08X", got, checksum)
 	}
 
+	// Choose record sizes based on version for backward-compatible parsing.
+	rootRecSize := uint64(RootRecordSize)
+	wordRecSize := uint64(WordRecordSize)
+	if version == 1 {
+		rootRecSize = RootRecordSizeV1
+		wordRecSize = WordRecordSizeV1
+	}
+
 	// Validate table bounds before parsing — guards against corrupt offsets.
-	rootTableEnd := uint64(rootTableOffset) + uint64(rootCount)*RootRecordSize
-	wordTableEnd := uint64(wordTableOffset) + uint64(wordCount)*WordRecordSize
+	rootTableEnd := uint64(rootTableOffset) + uint64(rootCount)*rootRecSize
+	wordTableEnd := uint64(wordTableOffset) + uint64(wordCount)*wordRecSize
 	fileLen := uint64(len(data))
 	if rootTableEnd > fileLen {
 		return nil, fmt.Errorf("corrupt file: root table extends past end of file")
@@ -110,24 +118,30 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 	roots := make([]RootRecord, rootCount)
 	roff := int(rootTableOffset)
 	for i := range roots {
-		roots[i] = RootRecord{
-			RootID:        ByteOrder.Uint32(data[roff:]),
-			WordCount:     ByteOrder.Uint32(data[roff+4:]),
-			FirstWordIdx:  ByteOrder.Uint32(data[roff+8:]),
-			NameOffset:    ByteOrder.Uint32(data[roff+12:]),
-			LangCoverage:  ByteOrder.Uint32(data[roff+16:]),
-			ParentRootID:  ByteOrder.Uint32(data[roff+20:]),
-			OriginOffset:  ByteOrder.Uint32(data[roff+24:]),
+		r := RootRecord{
+			RootID:       ByteOrder.Uint32(data[roff:]),
+			WordCount:    ByteOrder.Uint32(data[roff+4:]),
+			FirstWordIdx: ByteOrder.Uint32(data[roff+8:]),
+			NameOffset:   ByteOrder.Uint32(data[roff+12:]),
+			LangCoverage: ByteOrder.Uint32(data[roff+16:]),
+			ParentRootID: ByteOrder.Uint32(data[roff+20:]),
+			OriginOffset: ByteOrder.Uint32(data[roff+24:]),
 			MeaningOffset: ByteOrder.Uint32(data[roff+28:]),
 		}
-		roff += RootRecordSize
+		if version >= 2 {
+			r.HypernymRootID = ByteOrder.Uint32(data[roff+32:])
+			r.AntonymRootID  = ByteOrder.Uint32(data[roff+36:])
+			r.SynonymRootID  = ByteOrder.Uint32(data[roff+40:])
+		}
+		roots[i] = r
+		roff += int(rootRecSize)
 	}
 
 	// Parse word table
 	words := make([]WordRecord, wordCount)
 	woff := int(wordTableOffset)
 	for i := range words {
-		words[i] = WordRecord{
+		w := WordRecord{
 			WordID:     ByteOrder.Uint32(data[woff:]),
 			RootID:     ByteOrder.Uint32(data[woff+4:]),
 			Lang:       ByteOrder.Uint32(data[woff+8:]),
@@ -137,7 +151,11 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 			FreqRank:   ByteOrder.Uint32(data[woff+24:]),
 			Flags:      ByteOrder.Uint32(data[woff+28:]),
 		}
-		woff += WordRecordSize
+		if version >= 2 {
+			w.PronOffset = ByteOrder.Uint32(data[woff+32:])
+		}
+		words[i] = w
+		woff += int(wordRecSize)
 	}
 
 	heap := data[heapOffset : heapOffset+heapSize]
@@ -357,6 +375,43 @@ func (l *Lexicon) RootOrigin(r *RootRecord) string {
 // RootMeaning returns the English gloss of a root.
 func (l *Lexicon) RootMeaning(r *RootRecord) string {
 	return l.str(r.MeaningOffset)
+}
+
+// WordPron returns the IPA pronunciation string for a word record.
+// Returns "" if no IPA was annotated (PronOffset == 0).
+// IPA strings use standard Unicode IPA characters (e.g. "/ˈtɛr.ɪ.bəl/").
+func (l *Lexicon) WordPron(w *WordRecord) string {
+	if w.PronOffset == 0 {
+		return ""
+	}
+	return l.str(w.PronOffset)
+}
+
+// Hypernym returns the hypernym root (is-a parent) of the given root, or nil.
+// Example: "dog" root → hypernym root "animal".
+func (l *Lexicon) Hypernym(r *RootRecord) *RootRecord {
+	if r.HypernymRootID == 0 {
+		return nil
+	}
+	return l.LookupRoot(r.HypernymRootID)
+}
+
+// Antonym returns the antonym root of the given root, or nil.
+// Example: "good" root → antonym root "bad".
+func (l *Lexicon) Antonym(r *RootRecord) *RootRecord {
+	if r.AntonymRootID == 0 {
+		return nil
+	}
+	return l.LookupRoot(r.AntonymRootID)
+}
+
+// Synonym returns the nearest synonym root, or nil.
+// Example: "anger" root → synonym root "rage".
+func (l *Lexicon) Synonym(r *RootRecord) *RootRecord {
+	if r.SynonymRootID == 0 {
+		return nil
+	}
+	return l.LookupRoot(r.SynonymRootID)
 }
 
 // EtymologyChain traces the etymology from a root back to its ancestor.

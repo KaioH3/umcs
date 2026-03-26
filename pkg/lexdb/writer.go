@@ -62,14 +62,17 @@ func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, e
 		m := meta[r.RootID]
 		globalLangFlags |= m.langCoverage
 		rootRecords[i] = RootRecord{
-			RootID:        r.RootID,
-			WordCount:     m.wordCount,
-			FirstWordIdx:  m.firstWordIdx,
-			NameOffset:    heap.add(r.RootStr),
-			LangCoverage:  m.langCoverage,
-			ParentRootID:  r.ParentRootID,
-			OriginOffset:  heap.add(r.Origin),
-			MeaningOffset: heap.add(r.MeaningEN),
+			RootID:         r.RootID,
+			WordCount:      m.wordCount,
+			FirstWordIdx:   m.firstWordIdx,
+			NameOffset:     heap.add(r.RootStr),
+			LangCoverage:   m.langCoverage,
+			ParentRootID:   r.ParentRootID,
+			OriginOffset:   heap.add(r.Origin),
+			MeaningOffset:  heap.add(r.MeaningEN),
+			HypernymRootID: r.HypernymRootID,
+			AntonymRootID:  r.AntonymRootID,
+			SynonymRootID:  r.SynonymRootID,
 		}
 	}
 
@@ -80,6 +83,10 @@ func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, e
 		if !ok {
 			return nil, fmt.Errorf("unknown lang %q for word %q", w.Lang, w.Word)
 		}
+		pronOffset := uint32(0)
+		if w.Pron != "" {
+			pronOffset = heap.add(w.Pron)
+		}
 		wordRecords[i] = WordRecord{
 			WordID:     w.WordID,
 			RootID:     w.RootID,
@@ -89,6 +96,7 @@ func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, e
 			NormOffset: heap.add(normalize(w.Norm)),
 			FreqRank:   w.FreqRank,
 			Flags:      w.Flags,
+			PronOffset: pronOffset,
 		}
 	}
 
@@ -144,6 +152,9 @@ func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, e
 		write(rr.ParentRootID)
 		write(rr.OriginOffset)
 		write(rr.MeaningOffset)
+		write(rr.HypernymRootID)
+		write(rr.AntonymRootID)
+		write(rr.SynonymRootID)
 		if err != nil {
 			return nil, fmt.Errorf("write root table: %w", err)
 		}
@@ -159,6 +170,7 @@ func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, e
 		write(wr.NormOffset)
 		write(wr.FreqRank)
 		write(wr.Flags)
+		write(wr.PronOffset)
 		if err != nil {
 			return nil, fmt.Errorf("write word table: %w", err)
 		}
@@ -220,10 +232,19 @@ func validate(roots []seed.Root, words []seed.Word) error {
 		}
 		rootSet[r.RootID] = true
 	}
-	// Validate etymology links
+	// Validate etymology and semantic relation links
 	for _, r := range roots {
 		if r.ParentRootID != 0 && !rootSet[r.ParentRootID] {
 			return fmt.Errorf("root %q parent_root_id %d not found", r.RootStr, r.ParentRootID)
+		}
+		if r.HypernymRootID != 0 && !rootSet[r.HypernymRootID] {
+			return fmt.Errorf("root %q hypernym_root_id %d not found", r.RootStr, r.HypernymRootID)
+		}
+		if r.AntonymRootID != 0 && !rootSet[r.AntonymRootID] {
+			return fmt.Errorf("root %q antonym_root_id %d not found", r.RootStr, r.AntonymRootID)
+		}
+		if r.SynonymRootID != 0 && !rootSet[r.SynonymRootID] {
+			return fmt.Errorf("root %q synonym_root_id %d not found", r.RootStr, r.SynonymRootID)
 		}
 	}
 	wordIDSet := make(map[uint32]string, len(words))
@@ -279,6 +300,9 @@ func buildData(roots []RootRecord, words []WordRecord, heap []byte) []byte {
 		appendU32(r.ParentRootID)
 		appendU32(r.OriginOffset)
 		appendU32(r.MeaningOffset)
+		appendU32(r.HypernymRootID)
+		appendU32(r.AntonymRootID)
+		appendU32(r.SynonymRootID)
 	}
 	for _, w := range words {
 		appendU32(w.WordID)
@@ -289,6 +313,7 @@ func buildData(roots []RootRecord, words []WordRecord, heap []byte) []byte {
 		appendU32(w.NormOffset)
 		appendU32(w.FreqRank)
 		appendU32(w.Flags)
+		appendU32(w.PronOffset)
 	}
 	buf = append(buf, heap...)
 	return buf

@@ -3,6 +3,7 @@
 // Usage:
 //
 //	lexsent build    [--roots PATH] [--words PATH] [--out PATH]
+//	lexsent demo     [--lexicon PATH]
 //	lexsent lookup   <word>
 //	lexsent cognates <word>
 //	lexsent etymo    <word>
@@ -23,7 +24,10 @@ import (
 	"github.com/kak/umcs/pkg/analyze"
 	"github.com/kak/umcs/pkg/api"
 	"github.com/kak/umcs/pkg/discover"
+	"github.com/kak/umcs/pkg/infer"
 	"github.com/kak/umcs/pkg/lexdb"
+	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/phon"
 	"github.com/kak/umcs/pkg/seed"
 	"github.com/kak/umcs/pkg/sentiment"
 	"github.com/kak/umcs/pkg/tokenizer"
@@ -40,6 +44,8 @@ func main() {
 	switch os.Args[1] {
 	case "build":
 		cmdBuild(os.Args[2:])
+	case "demo":
+		cmdDemo(os.Args[2:])
 	case "lookup":
 		cmdLookup(os.Args[2:])
 	case "cognates":
@@ -63,6 +69,243 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+}
+
+// --- demo ---
+
+func cmdDemo(args []string) {
+	lexPath := defaultLexicon
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--lexicon" && i+1 < len(args) {
+			lexPath = args[i+1]
+			i++
+		}
+	}
+
+	sep := strings.Repeat("═", 56)
+	fmt.Println(sep)
+	fmt.Println(" UMCS Demo — Universal Morpheme Coordinate System")
+	fmt.Println(sep)
+	fmt.Println()
+
+	lex, err := lexdb.Load(lexPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load lexicon: %v\n  → run 'lexsent build' first\n", err)
+		os.Exit(1)
+	}
+
+	// ── [1] Lookup ───────────────────────────────────────────────────────────
+	demoWord := "negative"
+	w := lex.LookupWord(demoWord)
+	if w == nil {
+		// Try a fallback if negative is not in lexicon.
+		for _, wr := range lex.Words {
+			if wr.WordID != 0 {
+				demoWord = lex.WordStr(&wr)
+				w = &wr
+				break
+			}
+		}
+	}
+
+	if w != nil {
+		fmt.Printf("[1] LOOKUP: %q (%s)\n", lex.WordStr(w), lexdb.LangName(w.Lang))
+		fmt.Printf("  word_id   = %d  (root_id=%d, variant=%d)\n",
+			w.WordID, morpheme.RootOf(w.WordID), morpheme.VariantOf(w.WordID))
+
+		root := lex.LookupRoot(w.RootID)
+		if root != nil {
+			fmt.Printf("  root      = %-10s (%s: %q)\n",
+				lex.RootStr(root), lex.RootOrigin(root), lex.RootMeaning(root))
+		}
+
+		dec := sentiment.Decode(w.Sentiment)
+		fmt.Printf("  polarity  = %-10s intensity=%-9s role=%s\n",
+			dec["polarity"], dec["intensity"], dec["role"])
+		fmt.Printf("  POS       = %-10s arousal=%-10s dominance=%s\n",
+			dec["pos"], dec["arousal"], dec["dominance"])
+		fmt.Printf("  AoA       = %-10s concrete=%-10s register=%s\n",
+			dec["aoa"], dec["concreteness"], dec["flags"])
+
+		tok := morpheme.Pack64(w.WordID, w.Sentiment, w.Flags)
+		fmt.Printf("  Token64   = 0x%016X\n", uint64(tok))
+		fmt.Println()
+
+		// ── [2] Token64 decoded ──────────────────────────────────────────────
+		fmt.Printf("[2] Token64 DECODED: 0x%016X\n", uint64(tok))
+		_, pay := morpheme.Unpack64(tok)
+		fmt.Printf("  root_id=%-6d variant=%-4d pos=%s  concrete=%d\n",
+			morpheme.RootOf64(tok), morpheme.VariantOf64(tok),
+			dec["pos"], boolBit(sentiment.IsConcrete(pay)))
+		fmt.Printf("  polarity=%-10s intensity=%-9s role=%s\n",
+			dec["polarity"], dec["intensity"], dec["role"])
+		fmt.Printf("  arousal=%-11s dominance=%-9s aoa=%s\n",
+			dec["arousal"], dec["dominance"], dec["aoa"])
+		fmt.Println()
+
+		// ── [3] Cognates ─────────────────────────────────────────────────────
+		cognates := lex.Cognates(w.WordID)
+		if len(cognates) > 1 {
+			fmt.Printf("[3] COGNATES of %q (root_id=%d):\n", lex.WordStr(w), w.RootID)
+			for _, c := range cognates {
+				cs := sentiment.Decode(c.Sentiment)
+				ctok := morpheme.Pack64(c.WordID, c.Sentiment, c.Flags)
+				fmt.Printf("  %-6s %-20s (%d) → %-9s %-9s Token64=0x%016X\n",
+					lexdb.LangName(c.Lang), lex.WordStr(&c), c.WordID,
+					cs["polarity"], cs["intensity"], uint64(ctok))
+			}
+			fmt.Println()
+		}
+	}
+
+	// ── [4] Sentiment analysis ───────────────────────────────────────────────
+	analysisText := "this product is not terrible at all"
+	fmt.Printf("[4] SENTIMENT ANALYSIS: %q\n", analysisText)
+	result := analyze.Analyze(lex, analysisText)
+	for _, t := range result.Tokens {
+		if !t.Found {
+			fmt.Printf("  %-22s [OOV]\n", t.Surface)
+			continue
+		}
+		mod := ""
+		if t.Negated {
+			mod = " [negated]"
+		} else if t.Amplified {
+			mod = " [amplified]"
+		}
+		if t.Role == "NEGATION_MARKER" {
+			fmt.Printf("  %-22s [%s, root=%s]\n", t.Surface, t.Role, t.RootStr)
+			continue
+		}
+		fmt.Printf("  %-22s polarity=%-9s weight=%+d%s\n",
+			t.Surface, t.Polarity, t.Weight, mod)
+	}
+	fmt.Printf("  Score: %+d  Verdict: %s\n\n", result.TotalScore, result.Verdict)
+
+	// ── [5] IPA & Phonology ──────────────────────────────────────────────────
+	fmt.Println("[5] IPA PRONUNCIATION & PHONOLOGY:")
+	phonWords := []string{"negative", "can", "must", "liberdade", "terrible", "será"}
+	for _, pw := range phonWords {
+		wr := lex.LookupWord(pw)
+		if wr == nil {
+			continue
+		}
+		pron := lex.WordPron(wr)
+		syl := phon.Syllables(wr.Flags)
+		stress := phon.StressName(wr.Flags)
+		val := phon.ValencyName(wr.Flags)
+		fmt.Printf("  %-20s [%s]  IPA:%-20s  syl=%-2d stress=%-14s valency=%s\n",
+			lex.WordStr(wr), lexdb.LangName(wr.Lang), pron, syl, stress, val)
+	}
+	fmt.Println()
+
+	// ── [6] Semantic relations ───────────────────────────────────────────────
+	fmt.Println("[6] SEMANTIC RELATIONS (antonym / hypernym / synonym):")
+	relRoots := []string{"negative", "good", "terrible", "can", "all"}
+	for _, rw := range relRoots {
+		wr := lex.LookupWord(rw)
+		if wr == nil {
+			continue
+		}
+		root := lex.LookupRoot(wr.RootID)
+		if root == nil {
+			continue
+		}
+		antStr, hypStr, synStr := "—", "—", "—"
+		if r := lex.Antonym(root); r != nil {
+			antStr = fmt.Sprintf("%s(%d)", lex.RootStr(r), r.RootID)
+		}
+		if r := lex.Hypernym(root); r != nil {
+			hypStr = fmt.Sprintf("%s(%d)", lex.RootStr(r), r.RootID)
+		}
+		if r := lex.Synonym(root); r != nil {
+			synStr = fmt.Sprintf("%s(%d)", lex.RootStr(r), r.RootID)
+		}
+		fmt.Printf("  %-12s → ant:%-14s hyp:%-14s syn:%s\n",
+			lex.RootStr(root), antStr, hypStr, synStr)
+	}
+	fmt.Println()
+
+	// ── [7] Morphological inference ──────────────────────────────────────────
+	fmt.Println("[7] MORPHOLOGICAL INFERENCE (pkg/infer):")
+	inferCases := []struct{ word, lang string }{
+		{"liberdade", "PT"},
+		{"rapidamente", "PT"},
+		{"happiness", "EN"},
+		{"beautiful", "EN"},
+		{"liberation", "EN"},
+		{"Freiheit", "DE"},
+	}
+	for _, c := range inferCases {
+		pos := infer.POSFromShape(c.word, c.lang)
+		abstract := infer.IsAbstractFromShape(c.word, c.lang)
+		posName := sentiment.Decode(pos)["pos"]
+		abstract_ := ""
+		if abstract {
+			abstract_ = " + ABSTRACT"
+		}
+		fmt.Printf("  %-20s (%s) → POS=%-8s%s\n", c.word, c.lang, posName, abstract_)
+	}
+	fmt.Println()
+
+	// ── [8] Multilingual token stream ────────────────────────────────────────
+	multiText := "not terrible very good"
+	fmt.Printf("[8] MULTILINGUAL TOKEN STREAM: %q\n", multiText)
+	tokens := tokenizer.Tokenize(lex, multiText)
+	fmt.Printf("  %-20s  %-10s  %-10s  %s\n", "surface", "root_id", "word_id", "Token64")
+	fmt.Printf("  %s\n", strings.Repeat("-", 70))
+	for _, t := range tokens {
+		if !t.Known {
+			fmt.Printf("  %-20s  %-10s  %-10s  %s\n", t.Surface, "?", "?", "?")
+			continue
+		}
+		fmt.Printf("  %-20s  %-10d  %-10d  0x%016X\n",
+			t.Surface, t.RootID, t.WordID, uint64(t.Token64))
+	}
+	fmt.Println()
+
+	// ── [9] Etymology ────────────────────────────────────────────────────────
+	if w != nil {
+		fmt.Printf("[9] ETYMOLOGY CHAIN: %q\n", lex.WordStr(w))
+		chain := lex.EtymologyChain(w.RootID)
+		for i, r := range chain {
+			indent := strings.Repeat("  ", i+1)
+			arrow := "→ "
+			if i == 0 {
+				arrow = "  "
+			}
+			fmt.Printf("%s%s%s (ID=%d, %s: %s)\n",
+				indent, arrow, lex.RootStr(&r), r.RootID, lex.RootOrigin(&r), lex.RootMeaning(&r))
+		}
+		fmt.Println()
+	}
+
+	// ── [10] Lexicon stats ───────────────────────────────────────────────────
+	s := lex.Stats
+	fmt.Println("[10] LEXICON STATS:")
+	fmt.Printf("  %d roots | %d words | %d languages\n",
+		s.RootCount, s.WordCount, countLangs(s.LangFlags))
+	fmt.Printf("  Token64 capacity: ~%d million word_ids × 32 semantic bits\n",
+		(1<<20)/1000*1000)
+	fmt.Printf("  Binary size: %.1f KB (entire cross-lingual lexicon in memory)\n",
+		float64(s.FileSize)/1024)
+	fmt.Println()
+}
+
+func boolBit(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func countLangs(flags uint32) int {
+	n := 0
+	for flags != 0 {
+		n += int(flags & 1)
+		flags >>= 1
+	}
+	return n
 }
 
 // --- build ---
@@ -135,10 +378,47 @@ func cmdLookup(args []string) {
 	fmt.Printf("Intensity: %s\n", sent["intensity"])
 	fmt.Printf("Role:      %s\n", sent["role"])
 	fmt.Printf("Domain:    %s\n", sent["domain"])
+	fmt.Printf("POS:       %s\n", sent["pos"])
+	fmt.Printf("Arousal:   %s  Dominance: %s  AoA: %s\n",
+		sent["arousal"], sent["dominance"], sent["aoa"])
 	if sent["flags"] != "" {
 		fmt.Printf("Flags:     %s\n", sent["flags"])
 	}
 	fmt.Printf("FreqRank:  %d\n", w.FreqRank)
+
+	// IPA pronunciation
+	if pron := lex.WordPron(w); pron != "" {
+		fmt.Printf("IPA:       %s\n", pron)
+	}
+
+	// Phonology from flags
+	syl := phon.Syllables(w.Flags)
+	if syl > 0 {
+		fmt.Printf("Syllables: %d  Stress: %s  Valency: %s\n",
+			syl, phon.StressName(w.Flags), phon.ValencyName(w.Flags))
+	}
+	if w.Flags&phon.IronyCapable != 0 {
+		fmt.Printf("Note:      irony-capable\n")
+	}
+	if w.Flags&phon.Neologism != 0 {
+		fmt.Printf("Note:      neologism\n")
+	}
+
+	// Semantic relations
+	if root != nil {
+		if ant := lex.Antonym(root); ant != nil {
+			fmt.Printf("Antonym:   %s (ID=%d — %s)\n",
+				lex.RootStr(ant), ant.RootID, lex.RootMeaning(ant))
+		}
+		if hyp := lex.Hypernym(root); hyp != nil {
+			fmt.Printf("Hypernym:  %s (ID=%d — %s)\n",
+				lex.RootStr(hyp), hyp.RootID, lex.RootMeaning(hyp))
+		}
+		if syn := lex.Synonym(root); syn != nil {
+			fmt.Printf("Synonym:   %s (ID=%d — %s)\n",
+				lex.RootStr(syn), syn.RootID, lex.RootMeaning(syn))
+		}
+	}
 
 	cognates := lex.Cognates(w.WordID)
 	if len(cognates) > 1 {
@@ -618,6 +898,7 @@ func usage() {
 
 Commands:
   build    [--roots PATH] [--words PATH] [--out PATH]
+  demo     [--lexicon PATH]
   lookup   <word>
   cognates <word>
   etymo    <word>

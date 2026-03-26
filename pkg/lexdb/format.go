@@ -7,6 +7,13 @@
 //   [S..]     String heap (null-terminated UTF-8 strings, byte-addressed)
 //
 // All integers are little-endian uint32 (4 bytes).
+//
+// # Format versions
+//
+//   Version 1 — RootRecord 32 bytes (8 fields), WordRecord 32 bytes (8 fields)
+//   Version 2 — RootRecord 44 bytes (+HypernymRootID, AntonymRootID, SynonymRootID)
+//               WordRecord 36 bytes (+PronOffset for IPA string)
+//               Backward-compatible reader: v1 files load with new fields zeroed.
 package lexdb
 
 import "encoding/binary"
@@ -15,11 +22,20 @@ var ByteOrder = binary.LittleEndian
 
 const (
 	Magic   uint32 = 0x4C534442 // "LSDB"
-	Version uint32 = 1
+	Version uint32 = 2
 
-	HeaderSize     = 64
-	RootRecordSize = 32 // extended with etymology fields
-	WordRecordSize = 32
+	// HeaderSize is always 64 bytes across all versions.
+	HeaderSize = 64
+
+	// V1 record sizes (for backward-compatible reading).
+	RootRecordSizeV1 = 32 // 8 × uint32
+	WordRecordSizeV1 = 32 // 8 × uint32
+
+	// V2 record sizes (current format).
+	// RootRecord gains 3 semantic-relation fields (+12 bytes).
+	// WordRecord gains PronOffset for IPA pronunciation (+4 bytes).
+	RootRecordSize = 44 // 11 × uint32
+	WordRecordSize = 36 // 9 × uint32
 
 	// Lang bitmask flags (bits in Header.LangFlags and Root.LangCoverage).
 	// One bit per language; supports up to 32 languages in a uint32.
@@ -126,6 +142,14 @@ const (
 
 	// Bit 20: CULTURAL_SPECIFIC — no equivalent in most other languages (e.g. "saudade", "schadenfreude").
 	CulturalSpecific uint32 = 1 << 20
+
+	// Bits 31..21: PHONOLOGY — packed into Flags (see pkg/phon for constants and helpers).
+	// bit  21      neologism
+	// bit  22      irony_capable
+	// bits 25..23  valency (Tesnière: 0=N/A, 1=intrans, 2=trans, 3=ditrans, 4=copular, 5=modal)
+	// bits 27..26  stress (0=unknown, 1=final/oxytone, 2=penult/paroxytone, 3=antepenult/proparoxytone)
+	// bits 31..28  syllable count (0=unknown, 1-15)
+	// See pkg/phon for SetSyllables, SetStress, SetValency, etc.
 )
 
 // Header is the 64-byte file header.
@@ -143,30 +167,46 @@ type Header struct {
 	_               [6]uint32 // reserved, 24 bytes
 }
 
-// RootRecord is one 32-byte root entry in the root table.
+// RootRecord is one 44-byte root entry in the root table (format v2).
+//
 // Etymology: ParentRootID links to the ancestral root (0 = no parent).
-// Example: Latin "negare" → root_id=1 is parent of "negar" (PT), "negate" (EN).
+// Semantic relations follow WordNet conventions:
+//   - HypernymRootID: is-a / generalization (dog → animal)
+//   - AntonymRootID:  direct antonym of opposite polarity (good → bad)
+//   - SynonymRootID:  nearest synonym root (anger ≈ rage)
+//
+// Example: "negat" → ParentRootID=0 (Latin proto-root)
+//          HypernymRootID=0 (grammatical scope marker, no hypernym)
+//          AntonymRootID=2  (affirm is its antonym)
 type RootRecord struct {
-	RootID       uint32
-	WordCount    uint32 // number of word records with this root
-	FirstWordIdx uint32 // index in word table of first cognate
-	NameOffset   uint32 // offset into string heap (the root string, e.g. "negat")
-	LangCoverage uint32 // bitmask of languages covered
-	ParentRootID uint32 // etymology: ancestral root (0 = proto/no parent)
-	OriginOffset uint32 // offset into string heap (origin lang/proto, e.g. "LATIN")
-	MeaningOffset uint32 // offset into string heap (English gloss, e.g. "to deny")
+	RootID         uint32 // unique root identifier
+	WordCount      uint32 // number of word records with this root
+	FirstWordIdx   uint32 // index in word table of first cognate
+	NameOffset     uint32 // offset into string heap (root string, e.g. "negat")
+	LangCoverage   uint32 // bitmask of languages covered
+	ParentRootID   uint32 // etymology: ancestral root (0 = proto/no parent)
+	OriginOffset   uint32 // offset into string heap (e.g. "LATIN")
+	MeaningOffset  uint32 // offset into string heap (English gloss)
+	HypernymRootID uint32 // WordNet-style is-a parent root (0 = none) [v2]
+	AntonymRootID  uint32 // primary antonym root (0 = none) [v2]
+	SynonymRootID  uint32 // nearest synonym root (0 = none) [v2]
 }
 
-// WordRecord is one 32-byte word entry in the word table.
+// WordRecord is one 36-byte word entry in the word table (format v2).
+//
+// Phonology is packed into the high bits of Flags (see pkg/phon).
+// PronOffset points to an IPA pronunciation string in the heap (0 = not annotated).
+// IPA strings use standard Unicode IPA characters (e.g. "/ˈtɛr.ɪ.bəl/").
 type WordRecord struct {
-	WordID     uint32
-	RootID     uint32
-	Lang       uint32    // WordLangPT/EN/ES/IT/DE
-	Sentiment  uint32    // packed bitmask (see pkg/sentiment)
-	WordOffset uint32    // offset into string heap (actual word, e.g. "negativo")
-	NormOffset uint32    // offset into string heap (ASCII-normalized, e.g. "negativo")
-	FreqRank   uint32    // corpus frequency rank (0=unknown)
-	Flags      uint32    // WordFlag* bitmask
+	WordID     uint32 // packed (root_id<<12)|variant — primary LLM token
+	RootID     uint32 // root family (for cross-linguistic embedding sharing)
+	Lang       uint32 // WordLangPT/EN/ES/IT/DE (see format.go)
+	Sentiment  uint32 // packed bitmask (see pkg/sentiment)
+	WordOffset uint32 // offset into string heap (surface form, e.g. "negativo")
+	NormOffset uint32 // offset into string heap (ASCII-normalized form)
+	FreqRank   uint32 // corpus frequency rank (0=unknown)
+	Flags      uint32 // WordFlag* | register | ontological | polysemy | phonology
+	PronOffset uint32 // IPA pronunciation offset in heap (0 = none) [v2]
 }
 
 // LangName maps a lang ID to its ISO 639-1/639-2 code.

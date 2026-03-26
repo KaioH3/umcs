@@ -1,122 +1,132 @@
-root_id,root_str,origin,meaning_en,notes,parent_root_id
-1,negat,LATIN,to deny or negate,from negare (to deny),0
-2,affirm,LATIN,to affirm or confirm,from affirmare,0
-3,bon,LATIN,good,from bonus (good),0
-4,mal,LATIN,bad or evil,from malus (bad),0
-5,fort,LATIN,strong or powerful,from fortis (strong),0
-6,liber,LATIN,free,from liber (free),0
-7,am,LATIN,to love,from amare (to love),0
-8,trist,LATIN,sad,from tristis (sad),0
-9,grat,LATIN,grateful or pleasant,from gratus (grateful),0
-10,terr,LATIN,fear or dread,from terror,0
-11,viol,LATIN,violence or force,from violentus,0
-12,pac,LATIN,peace,from pax/pacis,0
-13,just,LATIN,just or right,from justus,0
-14,sol,LATIN,alone or sole,from solus,0
-15,greg,LATIN,group or flock,from grex/gregis,0
-16,aud,LATIN,to hear or dare,from audire,0
-17,vid,LATIN,to see,from videre,0
-18,scrib,LATIN,to write,from scribere,0
-19,dict,LATIN,to say or declare,from dicere,0
-20,duc,LATIN,to lead,from ducere,0
-21,fac,LATIN,to make or do,from facere,0
-22,port,LATIN,to carry,from portare,0
-23,mit,LATIN,to send,from mittere,0
-24,pon,LATIN,to place or put,from ponere,0
-25,ten,LATIN,to hold,from tenere,0
-26,ven,LATIN,to come,from venire,0
-27,vers,LATIN,to turn,from vertere,0
-28,voc,LATIN,to call or voice,from vocare,0
-29,cap,LATIN,to take or seize,from capere,0
-30,cred,LATIN,to believe or trust,from credere,0
-31,excel,LATIN,to surpass or excel,from excellere,0
-32,terrib,LATIN,terrible or causing terror,derived from terrere,10
-33,horr,LATIN,horror or dread,from horrere,0
-34,bel,LATIN,beautiful,from bellus,0
-35,felic,LATIN,happy or fortunate,from felix/felicis,0
-36,serv,LATIN,to serve or preserve,from servire,0
-37,ir,LATIN,anger or wrath,from ira (anger),0
-38,dolor,LATIN,pain or grief,from dolor,0
-39,sper,LATIN,hope,from sperare,0
-40,tim,LATIN,fear,from timere,0
-41,cur,LATIN,to take care or run,from cura/currere,0
-42,nov,LATIN,new,from novus,0
-43,vit,LATIN,life,from vita,0
-44,mort,LATIN,death,from mors/mortis,0
-45,laud,LATIN,praise,from laudare,0
-46,culp,LATIN,fault or blame,from culpa,0
-47,litig,LATIN,dispute or litigation,from litigare,13
-48,fid,LATIN,faith or trust,from fides,30
-49,clar,LATIN,clear or bright,from clarus,0
-50,magn,LATIN,great or large,from magnus,0
-51,parv,LATIN,small,from parvus,0
-52,plen,LATIN,full,from plenus,0
-53,vac,LATIN,empty,from vacuus,0
-54,rapid,LATIN,fast,from rapidus,0
-55,lent,LATIN,slow,from lentus,0
-56,gut,PROTO_GERMANIC,good,Proto-Germanic gutaz → EN good / DE gut,0
-57,libh,PROTO_GERMANIC,love,Proto-Germanic lubją → EN love / DE Liebe,0
-58,heil,PROTO_GERMANIC,holy or whole,Proto-Germanic hailagaz → EN holy / DE heilig,0
-59,ang,PROTO_GERMANIC,narrow or painful,Proto-Germanic *angaz → EN anguish / DE eng,0
-60,stark,PROTO_GERMANIC,strong or rigid,Proto-Germanic starkaz → EN stark / DE stark,0
-61,ne,PROTO_INDO_EUROPEAN,negation particle,PIE *ne → not/não/no/nicht/non/non,0
-62,vald,PROTO_GERMANIC,very or powerful,PIE *wal → very/sehr/muy/molto,0
-63,et,LATIN,and or connector,from et/et → and/e/y/und,0
-64,cond,PROTO_INDO_EUROPEAN,conditional connector,PIE *ḱe → if/se/si/wenn — marks hypothetical clauses,0
-65,caus,LATIN,causal connector,from causa → because/porque/weil — marks reason clauses,0
-66,conc,LATIN,concessive connector,from concedere → although/embora/obwohl — marks contrast,0
-67,cons,LATIN,consecutive connector,from consequi → therefore/portanto/also/donc — marks consequence,0
-68,temp,LATIN,temporal connector,from tempus → when/quando/wenn/quand — marks time clauses,0
-69,vel,LATIN,to want or wish,from velle → want/querer/wollen/vouloir — volitional verbs,0
-70,cert,LATIN,certain or sure,from certus → certain/certo/sicher/sure — epistemic markers,0
-71,optim,LATIN,optimal or best,from optimus → ótimo/optimal/best — positive superlative scale,0
-72,pess,LATIN,worst or pessimal,from pessimus → péssimo/worst/pésimo — negative extreme scale,0
-73,dub,LATIN,doubt or uncertain,from dubius → doubt/dúvida/duda — epistemic uncertainty,0
-74,愛,CHINESE,love or affection,CJK ideogram 愛 — shared in ZH/JA(ai)/KO(ae) — same root as amor,7
-75,悲,CHINESE,sorrow or grief,CJK ideogram 悲 — shared in ZH/JA(hi)/KO(bi) — same root as tristis,8
-76,喜,CHINESE,joy or happiness,CJK ideogram 喜 — shared in ZH/JA(ki)/KO(hui) — same root as felix,35
-77,怒,CHINESE,anger or rage,CJK ideogram 怒 — shared in ZH/JA(do)/KO(no) — same root as ira,37
-78,美,CHINESE,beauty or beautiful,CJK ideogram 美 — shared in ZH/JA(bi)/KO(mi) — same root as bellus,34
-79,善,CHINESE,good or virtuous,CJK ideogram 善 — shared in ZH/JA(zen)/KO(seon) — same root as bonus,3
-80,悪,CHINESE,evil or bad,CJK ideogram 悪 — shared in ZH/JA(aku)/KO(ak) — same root as malus,4
-81,希望,CHINESE,hope or wish,CJK compound 希(rare)+望(hope/desire) — shared ZH/JA(kibou) — same root as sperare,39
-82,kak,PROTO_GERMANIC,excretion taboo (vulgar),Proto-Germanic *kak — cagar/caca/shit — vulgar excretion register,0
-83,merd,LATIN,excrement vulgar,from Latin merda — merde/merda/mierda/shit — excrement,0
-84,fod,PROTO_GERMANIC,sexual vulgar intensifier,Proto-Germanic *fug — fuck/foda/foder/fotre — vulgar sexual act; doubles as intensifier,0
-85,putan,LATIN,insult/vulgar intensifier,from Latin puta (girl/whore) — puta/putain/puttana — strongest negative intensifier in Romance,0
-86,spec,LATIN,to look or observe,from spectare/specere — spectacular/especial/special/spécial,0
-87,grad,LATIN,step or degree,from gradus — gradual/grade/grado/grau — progression root,0
-88,lux,LATIN,light or brightness,from lux/lucis — luz/luce/lucid — luminosity root,0
-89,corp,LATIN,body or substance,from corpus/corporis — corpo/cuerpo/corps/Körper,0
-90,man,LATIN,hand or agency,from manus — mão/mano/main — manual root,0
-91,aqua,LATIN,water,from aqua — água/agua/acqua/eau — universal water root,0
-92,terra,LATIN,earth or land,from terra — terra/tierra/terre — earth root,0
-93,path,GREEK,suffering or feeling,from pathos — pathos/pathético/pathétique,0
-94,log,GREEK,word or reason,from logos — lógica/logic/logique,0
-95,phil,GREEK,love or fondness,from philein — filosofia/philosophy/philosophie,0
-96,auto,GREEK,self,from autos — automático/automatic/automatique,0
-97,krat,GREEK,power or rule,from kratos — democracia/democracy/démocratie,0
-98,cru,LATIN,raw or cruel,from crudus/crudelis — cruel/crueldade/cruauté,0
-99,dulc,LATIN,sweet or pleasant,from dulcis — doce/dulce/doux/dolce,0
-100,san,LATIN,healthy or whole,from sanus — são/sano/sain/sane,0
-101,miser,LATIN,wretched or pitiable,from miser — mísero/miserable/misère/misery,0
-102,febr,LATIN,fever or heat,from febris — febre/fiebre/fièvre/fever,0
-103,frat,LATIN,brother or fraternal bond,from frater — frère/fratello/fraternidade,0
-104,patr,LATIN,father or homeland,from pater/patria — pai/père/pátria/patriot,0
-105,sacr,LATIN,sacred or devoted,from sacer — sagrado/sacré/sacro/sacred,0
-106,cord,LATIN,heart or core,from cor/cordis — coração/corazón/cœur/cuore/cordial,0
-107,mund,LATIN,world or clean,from mundus — mundo/monde/mondo/mundane,0
-108,soci,LATIN,companion or society,from socius — sociedade/sociedad/société/society,0
-109,natur,LATIN,nature or birth,from natura/natus — natureza/nature/natura/Natur,0
-110,y,TUPI,water,Tupi y=water; root of Iguaçu(great water)/Igarapé/Ipiranga,0
-111,tup,TUPI,divine or thunder,Tupi Tupã=thunder god; sacred root of Tupinambá people,0
-112,aba,TUPI,person or human being,Tupi abá=person; root of Tupinambá(real people),0
-113,caa,TUPI,forest or plant or herb,Tupi caá=plant/forest; root of caatinga/caju/caipira,0
-114,slm,ARABIC,peace or safety,Arabic s-l-m root — salam/salim/muslim/shalom(HE cognate),0
-115,hbb,ARABIC,love or affection,Arabic h-b-b root — hubb(love)/habib(beloved),0
-116,jml,ARABIC,beauty or completeness,Arabic j-m-l root — jamal(beauty)/jamil(beautiful),0
-117,frh,ARABIC,joy or happiness,Arabic f-r-h root — farah(joy)/farhan(happy),0
-118,sukh,SANSKRIT,happiness or ease,Sanskrit sukha — antonym of dukkha; Buddhist/Hindu core concept,0
-119,duhkh,SANSKRIT,suffering or pain,Sanskrit dukkha — fundamental Buddhist concept of suffering,118
-120,shant,SANSKRIT,peace or tranquility,Sanskrit shanti — shanti(peace) across Hindi/Bengali/Marathi,0
-121,dharm,SANSKRIT,moral order or duty,Sanskrit dharma — moral law across Hindu/Buddhist/Jain traditions,0
+root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym_root_id,synonym_root_id
+1,negat,LATIN,to deny or negate,from negare (to deny),0,0,2,0
+2,affirm,LATIN,to affirm or confirm,from affirmare,0,0,1,0
+3,bon,LATIN,good,from bonus (good),0,0,4,56
+4,mal,LATIN,bad or evil,from malus (bad),0,0,3,0
+5,fort,LATIN,strong or powerful,from fortis (strong),0,0,0,0
+6,liber,LATIN,free,from liber (free),0,0,0,0
+7,am,LATIN,to love,from amare (to love),0,3,0,0
+8,trist,LATIN,sad,from tristis (sad),0,0,35,75
+9,grat,LATIN,grateful or pleasant,from gratus (grateful),0,3,0,0
+10,terr,LATIN,fear or dread,from terror,0,0,0,40
+11,viol,LATIN,violence or force,from violentus,0,4,12,0
+12,pac,LATIN,peace,from pax/pacis,0,0,11,0
+13,just,LATIN,just or right,from justus,0,3,46,0
+14,sol,LATIN,alone or sole,from solus,0,0,15,0
+15,greg,LATIN,group or flock,from grex/gregis,0,0,14,0
+16,aud,LATIN,to hear or dare,from audire,0,0,0,0
+17,vid,LATIN,to see,from videre,0,0,0,0
+18,scrib,LATIN,to write,from scribere,0,0,0,0
+19,dict,LATIN,to say or declare,from dicere,0,0,0,0
+20,duc,LATIN,to lead,from ducere,0,0,0,0
+21,fac,LATIN,to make or do,from facere,0,0,0,0
+22,port,LATIN,to carry,from portare,0,0,0,0
+23,mit,LATIN,to send,from mittere,0,0,0,0
+24,pon,LATIN,to place or put,from ponere,0,0,0,0
+25,ten,LATIN,to hold,from tenere,0,0,0,0
+26,ven,LATIN,to come,from venire,0,0,0,0
+27,vers,LATIN,to turn,from vertere,0,0,0,0
+28,voc,LATIN,to call or voice,from vocare,0,0,0,0
+29,cap,LATIN,to take or seize,from capere,0,0,0,0
+30,cred,LATIN,to believe or trust,from credere,0,0,73,0
+31,excel,LATIN,to surpass or excel,from excellere,0,3,72,71
+32,terrib,LATIN,terrible or causing terror,derived from terrere,10,4,0,0
+33,horr,LATIN,horror or dread,from horrere,0,10,0,0
+34,bel,LATIN,beautiful,from bellus,0,3,0,0
+35,felic,LATIN,happy or fortunate,from felix/felicis,0,3,8,76
+36,serv,LATIN,to serve or preserve,from servire,0,0,0,0
+37,ir,LATIN,anger or wrath,from ira (anger),0,0,0,77
+38,dolor,LATIN,pain or grief,from dolor,0,8,0,93
+39,sper,LATIN,hope,from sperare,0,3,73,81
+40,tim,LATIN,fear,from timere,0,0,0,10
+41,cur,LATIN,to take care or run,from cura/currere,0,0,0,0
+42,nov,LATIN,new,from novus,0,0,0,0
+43,vit,LATIN,life,from vita,0,0,44,0
+44,mort,LATIN,death,from mors/mortis,0,0,43,0
+45,laud,LATIN,praise,from laudare,0,3,46,0
+46,culp,LATIN,fault or blame,from culpa,0,4,45,0
+47,litig,LATIN,dispute or litigation,from litigare,13,0,0,0
+48,fid,LATIN,faith or trust,from fides,30,0,73,0
+49,clar,LATIN,clear or bright,from clarus,0,0,0,0
+50,magn,LATIN,great or large,from magnus,0,0,51,0
+51,parv,LATIN,small,from parvus,0,0,50,0
+52,plen,LATIN,full,from plenus,0,0,53,0
+53,vac,LATIN,empty,from vacuus,0,0,52,0
+54,rapid,LATIN,fast,from rapidus,0,0,55,0
+55,lent,LATIN,slow,from lentus,0,0,54,0
+56,gut,PROTO_GERMANIC,good,Proto-Germanic gutaz → EN good / DE gut,0,0,0,3
+57,libh,PROTO_GERMANIC,love,Proto-Germanic lubją → EN love / DE Liebe,0,0,0,7
+58,heil,PROTO_GERMANIC,holy or whole,Proto-Germanic hailagaz → EN holy / DE heilig,0,0,0,0
+59,ang,PROTO_GERMANIC,narrow or painful,Proto-Germanic *angaz → EN anguish / DE eng,0,0,0,0
+60,stark,PROTO_GERMANIC,strong or rigid,Proto-Germanic starkaz → EN stark / DE stark,0,0,0,0
+61,ne,PROTO_INDO_EUROPEAN,negation particle,PIE *ne → not/não/no/nicht/non/non,0,0,0,0
+62,vald,PROTO_GERMANIC,very or powerful,PIE *wal → very/sehr/muy/molto,0,0,0,0
+63,et,LATIN,and or connector,from et/et → and/e/y/und,0,0,0,0
+64,cond,PROTO_INDO_EUROPEAN,conditional connector,PIE *ḱe → if/se/si/wenn — marks hypothetical clauses,0,0,0,0
+65,caus,LATIN,causal connector,from causa → because/porque/weil — marks reason clauses,0,0,0,0
+66,conc,LATIN,concessive connector,from concedere → although/embora/obwohl — marks contrast,0,0,0,0
+67,cons,LATIN,consecutive connector,from consequi → therefore/portanto/also/donc — marks consequence,0,0,0,0
+68,temp,LATIN,temporal connector,from tempus → when/quando/wenn/quand — marks time clauses,0,0,0,0
+69,vel,LATIN,to want or wish,from velle → want/querer/wollen/vouloir — volitional verbs,0,0,0,0
+70,cert,LATIN,certain or sure,from certus → certain/certo/sicher/sure — epistemic markers,0,0,73,0
+71,optim,LATIN,optimal or best,from optimus → ótimo/optimal/best — positive superlative scale,0,3,72,31
+72,pess,LATIN,worst or pessimal,from pessimus → péssimo/worst/pésimo — negative extreme scale,0,4,71,0
+73,dub,LATIN,doubt or uncertain,from dubius → doubt/dúvida/duda — epistemic uncertainty,0,0,70,0
+74,愛,CHINESE,love or affection,CJK ideogram 愛 — shared in ZH/JA(ai)/KO(ae) — same root as amor,7,0,0,7
+75,悲,CHINESE,sorrow or grief,CJK ideogram 悲 — shared in ZH/JA(hi)/KO(bi) — same root as tristis,8,0,76,8
+76,喜,CHINESE,joy or happiness,CJK ideogram 喜 — shared in ZH/JA(ki)/KO(hui) — same root as felix,35,0,75,35
+77,怒,CHINESE,anger or rage,CJK ideogram 怒 — shared in ZH/JA(do)/KO(no) — same root as ira,37,0,0,37
+78,美,CHINESE,beauty or beautiful,CJK ideogram 美 — shared in ZH/JA(bi)/KO(mi) — same root as bellus,34,0,0,34
+79,善,CHINESE,good or virtuous,CJK ideogram 善 — shared in ZH/JA(zen)/KO(seon) — same root as bonus,3,0,80,3
+80,悪,CHINESE,evil or bad,CJK ideogram 悪 — shared in ZH/JA(aku)/KO(ak) — same root as malus,4,0,79,4
+81,希望,CHINESE,hope or wish,CJK compound 希(rare)+望(hope/desire) — shared ZH/JA(kibou) — same root as sperare,39,0,0,39
+82,kak,PROTO_GERMANIC,excretion taboo (vulgar),Proto-Germanic *kak — cagar/caca/shit — vulgar excretion register,0,0,0,0
+83,merd,LATIN,excrement vulgar,from Latin merda — merde/merda/mierda/shit — excrement,0,0,0,0
+84,fod,PROTO_GERMANIC,sexual vulgar intensifier,Proto-Germanic *fug — fuck/foda/foder/fotre — vulgar sexual act; doubles as intensifier,0,0,0,0
+85,putan,LATIN,insult/vulgar intensifier,from Latin puta (girl/whore) — puta/putain/puttana — strongest negative intensifier in Romance,0,0,0,0
+86,spec,LATIN,to look or observe,from spectare/specere — spectacular/especial/special/spécial,0,0,0,0
+87,grad,LATIN,step or degree,from gradus — gradual/grade/grado/grau — progression root,0,0,0,0
+88,lux,LATIN,light or brightness,from lux/lucis — luz/luce/lucid — luminosity root,0,0,0,0
+89,corp,LATIN,body or substance,from corpus/corporis — corpo/cuerpo/corps/Körper,0,0,0,0
+90,man,LATIN,hand or agency,from manus — mão/mano/main — manual root,0,0,0,0
+91,aqua,LATIN,water,from aqua — água/agua/acqua/eau — universal water root,0,0,0,0
+92,terra,LATIN,earth or land,from terra — terra/tierra/terre — earth root,0,0,0,0
+93,path,GREEK,suffering or feeling,from pathos — pathos/pathético/pathétique,0,8,0,38
+94,log,GREEK,word or reason,from logos — lógica/logic/logique,0,0,0,0
+95,phil,GREEK,love or fondness,from philein — filosofia/philosophy/philosophie,0,0,0,7
+96,auto,GREEK,self,from autos — automático/automatic/automatique,0,0,0,0
+97,krat,GREEK,power or rule,from kratos — democracia/democracy/démocratie,0,0,0,0
+98,cru,LATIN,raw or cruel,from crudus/crudelis — cruel/crueldade/cruauté,0,4,99,0
+99,dulc,LATIN,sweet or pleasant,from dulcis — doce/dulce/doux/dolce,0,3,98,0
+100,san,LATIN,healthy or whole,from sanus — são/sano/sain/sane,0,43,102,0
+101,miser,LATIN,wretched or pitiable,from miser — mísero/miserable/misère/misery,0,4,0,0
+102,febr,LATIN,fever or heat,from febris — febre/fiebre/fièvre/fever,0,0,100,0
+103,frat,LATIN,brother or fraternal bond,from frater — frère/fratello/fraternidade,0,0,0,0
+104,patr,LATIN,father or homeland,from pater/patria — pai/père/pátria/patriot,0,0,0,0
+105,sacr,LATIN,sacred or devoted,from sacer — sagrado/sacré/sacro/sacred,0,0,0,0
+106,cord,LATIN,heart or core,from cor/cordis — coração/corazón/cœur/cuore/cordial,0,0,0,0
+107,mund,LATIN,world or clean,from mundus — mundo/monde/mondo/mundane,0,0,0,0
+108,soci,LATIN,companion or society,from socius — sociedade/sociedad/société/society,0,0,0,0
+109,natur,LATIN,nature or birth,from natura/natus — natureza/nature/natura/Natur,0,0,0,0
+110,y,TUPI,water,Tupi y=water; root of Iguaçu(great water)/Igarapé/Ipiranga,0,0,0,0
+111,tup,TUPI,divine or thunder,Tupi Tupã=thunder god; sacred root of Tupinambá people,0,0,0,0
+112,aba,TUPI,person or human being,Tupi abá=person; root of Tupinambá(real people),0,0,0,0
+113,caa,TUPI,forest or plant or herb,Tupi caá=plant/forest; root of caatinga/caju/caipira,0,0,0,0
+114,slm,ARABIC,peace or safety,Arabic s-l-m root — salam/salim/muslim/shalom(HE cognate),0,0,0,12
+115,hbb,ARABIC,love or affection,Arabic h-b-b root — hubb(love)/habib(beloved),0,0,0,7
+116,jml,ARABIC,beauty or completeness,Arabic j-m-l root — jamal(beauty)/jamil(beautiful),0,78,0,34
+117,frh,ARABIC,joy or happiness,Arabic f-r-h root — farah(joy)/farhan(happy),0,0,0,35
+118,sukh,SANSKRIT,happiness or ease,Sanskrit sukha — antonym of dukkha; Buddhist/Hindu core concept,0,0,119,35
+119,duhkh,SANSKRIT,suffering or pain,Sanskrit dukkha — fundamental Buddhist concept of suffering,118,0,118,38
+120,shant,SANSKRIT,peace or tranquility,Sanskrit shanti — shanti(peace) across Hindi/Bengali/Marathi,0,0,0,12
+121,dharm,SANSKRIT,moral order or duty,Sanskrit dharma — moral law across Hindu/Buddhist/Jain traditions,0,0,0,0
+122,poss,LATIN,possibility or potentiality,from posse (to be able) — can/poder/pouvoir/können/potere; deontic modal,0,0,123,0
+123,neces,LATIN,necessity or obligation,from necesse (unavoidable) — must/dever/devoir/müssen/dovere; deontic modal,0,0,122,0
+124,praeter,LATIN,past or before,from praeteritus (gone by) — past tense marker across languages,0,0,126,0
+125,praesens,LATIN,present or now,from praesens (being present) — present tense marker,0,0,0,0
+126,futur,LATIN,future or forthcoming,from futurus (about to be) — future tense marker across languages,0,0,124,0
+127,omn,LATIN,all or every (universal quantifier),from omnis (all) — todo/all/tout/alle/tutto; universal quantification,0,0,128,0
+128,null_q,LATIN,none or zero (negative quantifier),from nullus (none) — nenhum/none/aucun/kein/nessuno; negative quantification,0,0,127,0
+129,aliq,LATIN,some or any (existential quantifier),from aliquis (someone) — algum/some/quelque/einige/qualche; existential quantification,127,0,0,0
+130,proxim,LATIN,proximate or near,from proximus (nearest) — aqui/here/ici/hier/qui; spatial proximity deictic,0,0,131,0
+131,distal,LATIN,distal or far,from distare (to be apart) — lá/there/là/dort/là; spatial distance deictic,0,0,130,0
