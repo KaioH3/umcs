@@ -47,9 +47,10 @@ const confidenceThreshold = 0.60
 // often include polysemous words that have primary meanings in other domains
 // (e.g. PT "comer"=eat has a vulgar sense, but is not a vulgar word).
 var blockedRoots = map[uint32]bool{
-	84: true, // fod  — sexual vulgar
-	85: true, // merd — excrement vulgar
-	86: true, // fod intensifier
+	82: true, // kak   — excretion taboo (Proto-Germanic)
+	83: true, // merd  — excrement vulgar (LATIN)
+	84: true, // fod   — sexual vulgar (Proto-Germanic)
+	85: true, // putan — insult/vulgar intensifier (LATIN)
 }
 
 // bfsItem is one element of the BFS work queue.
@@ -94,7 +95,9 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 	// Checkpoint for resumable runs.
 	cpPath := CheckpointPath(cfg.OutDir)
 	if cfg.Reset {
-		os.Remove(cpPath) // ignore error — file may not exist
+		if err := os.Remove(cpPath); err != nil && !os.IsNotExist(err) {
+			logf("  warning: could not reset checkpoint: %v", err)
+		}
 	}
 	cp, err := LoadCheckpoint(cpPath)
 	if err != nil {
@@ -185,25 +188,29 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 		// We defer committing it until we know at least one word passes the threshold.
 		rootAccepted := false
 
+		// Capture values at creation time — entry pointer must not be dereferenced later
+		// if the closure were ever stored beyond this iteration.
+		capturedOrigin := entry.AncestorLang
+		if capturedOrigin == "" {
+			capturedOrigin = "UNKNOWN"
+		}
+		capturedMeaning := firstDef(entry.Definitions, entry.Word)
+
 		commitRootIfNew := func() {
 			if isNewRoot && !rootAccepted {
 				rootAccepted = true
-				origin := entry.AncestorLang
-				if origin == "" {
-					origin = "UNKNOWN"
-				}
 				newRoot := seed.Root{
 					RootID:       rootID,
 					RootStr:      rootStr,
-					Origin:       origin,
-					MeaningEN:    firstDef(entry.Definitions, entry.Word),
+					Origin:       capturedOrigin,
+					MeaningEN:    capturedMeaning,
 					Notes:        "auto-discovered via Wiktionary",
 					ParentRootID: 0,
 				}
 				allRoots = append(allRoots, newRoot)
 				pendingRoots = append(pendingRoots, newRoot)
 				stats.RootsAdded++
-				logf("  + ROOT  id=%-4d str=%-12q origin=%s", rootID, rootStr, origin)
+				logf("  + ROOT  id=%-4d str=%-12q origin=%s", rootID, rootStr, capturedOrigin)
 			}
 		}
 

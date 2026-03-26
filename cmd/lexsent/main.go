@@ -736,16 +736,23 @@ func cmdDiscover(args []string) {
 			if !targetSet[w.Lang] {
 				continue
 			}
-			key := strings.ToLower(w.Word)
-			if !seen[key] {
-				seen[key] = true
-				seeds = append(seeds, key)
+			// Dedup by phonetic norm to avoid fetching the same Wiktionary page
+			// twice for surface variants (e.g. "café" and "cafe").
+			norm := discover.PhoneticNorm(w.Word)
+			if !seen[norm] {
+				seen[norm] = true
+				seeds = append(seeds, strings.ToLower(w.Word))
 			}
 		}
 	} else {
+		seen := map[string]bool{}
 		for _, s := range strings.Split(seedWords, ",") {
 			if t := strings.TrimSpace(s); t != "" {
-				seeds = append(seeds, strings.ToLower(t))
+				norm := discover.PhoneticNorm(t)
+				if !seen[norm] {
+					seen[norm] = true
+					seeds = append(seeds, strings.ToLower(t))
+				}
 			}
 		}
 	}
