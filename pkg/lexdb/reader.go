@@ -84,8 +84,6 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 
 	// Validate checksum
 	dataStart := uint32(HeaderSize)
-	dataLen := uint32(len(data)) - dataStart
-	_ = dataLen
 	expectedEnd := heapOffset + heapSize
 	if int(expectedEnd) > len(data) {
 		return nil, fmt.Errorf("corrupt file: heap extends past end of file")
@@ -93,6 +91,17 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 	got := fnv1a32(data[dataStart:expectedEnd])
 	if got != checksum {
 		return nil, fmt.Errorf("checksum mismatch: got 0x%08X, want 0x%08X", got, checksum)
+	}
+
+	// Validate table bounds before parsing — guards against corrupt offsets.
+	rootTableEnd := uint64(rootTableOffset) + uint64(rootCount)*RootRecordSize
+	wordTableEnd := uint64(wordTableOffset) + uint64(wordCount)*WordRecordSize
+	fileLen := uint64(len(data))
+	if rootTableEnd > fileLen {
+		return nil, fmt.Errorf("corrupt file: root table extends past end of file")
+	}
+	if wordTableEnd > fileLen {
+		return nil, fmt.Errorf("corrupt file: word table extends past end of file")
 	}
 
 	// Parse root table
@@ -165,8 +174,12 @@ func (l *Lexicon) buildIndex() {
 }
 
 // str reads a null-terminated string from the heap at the given offset.
+// Returns "" if offset is out of bounds (corrupted file guard).
 func (l *Lexicon) str(offset uint32) string {
 	start := int(offset)
+	if start >= len(l.Heap) {
+		return ""
+	}
 	end := start
 	for end < len(l.Heap) && l.Heap[end] != 0 {
 		end++

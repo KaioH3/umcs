@@ -33,7 +33,8 @@ const (
 	LangZH uint32 = 1 << 8
 	LangJA uint32 = 1 << 9
 	LangRU uint32 = 1 << 10
-	// bits 11..31 reserved for future languages
+	LangKO uint32 = 1 << 11
+	// bits 12..31 reserved for future languages
 
 	// Word.Lang values
 	WordLangPT uint32 = 0
@@ -47,6 +48,7 @@ const (
 	WordLangZH uint32 = 8
 	WordLangJA uint32 = 9
 	WordLangRU uint32 = 10
+	WordLangKO uint32 = 11
 
 	// Word.Flags bitmask
 	WordFlagProper      uint32 = 1 << 0
@@ -102,7 +104,7 @@ type WordRecord struct {
 
 // LangName maps a lang ID to its ISO 639-1 code.
 func LangName(lang uint32) string {
-	names := []string{"PT", "EN", "ES", "IT", "DE", "FR", "NL", "AR", "ZH", "JA", "RU"}
+	names := []string{"PT", "EN", "ES", "IT", "DE", "FR", "NL", "AR", "ZH", "JA", "RU", "KO"}
 	if int(lang) < len(names) {
 		return names[lang]
 	}
@@ -123,13 +125,18 @@ func ParseLang(s string) (uint32, bool) {
 		"ZH": WordLangZH,
 		"JA": WordLangJA,
 		"RU": WordLangRU,
+		"KO": WordLangKO,
 	}
 	id, ok := langs[s]
 	return id, ok
 }
 
 // LangBit converts a lang ID to its bitmask flag.
+// Returns 0 for unknown lang IDs (> 31) to prevent undefined bit-shift behavior.
 func LangBit(lang uint32) uint32 {
+	if lang > 31 {
+		return 0
+	}
 	return 1 << lang
 }
 

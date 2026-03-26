@@ -80,3 +80,7 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id
 79,善,CHINESE,good or virtuous,CJK ideogram 善 — shared in ZH/JA(zen)/KO(seon) — same root as bonus,3
 80,悪,CHINESE,evil or bad,CJK ideogram 悪 — shared in ZH/JA(aku)/KO(ak) — same root as malus,4
 81,希望,CHINESE,hope or wish,CJK compound 希(rare)+望(hope/desire) — shared ZH/JA(kibou) — same root as sperare,39
+82,kak,PROTO_GERMANIC,excretion taboo (vulgar),Proto-Germanic *kak — cagar/caca/shit — vulgar excretion register,0
+83,merd,LATIN,excrement vulgar,from Latin merda — merde/merda/mierda/shit — excrement,0
+84,fod,PROTO_GERMANIC,sexual vulgar intensifier,Proto-Germanic *fug — fuck/foda/foder/fotre — vulgar sexual act; doubles as intensifier,0
+85,putan,LATIN,insult/vulgar intensifier,from Latin puta (girl/whore) — puta/putain/puttana — strongest negative intensifier in Romance,0

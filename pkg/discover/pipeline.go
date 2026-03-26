@@ -280,9 +280,14 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 // isValidWord returns false for entries that should not be stored as lexicon words:
 //   - wikitext markup artifacts ([[...]] or {{...}})
 //   - multi-word phrases (contain a space) — these are idioms, not morphemes
-//   - single-character entries — too short to be meaningful
+//   - single-character entries that are not CJK — too short to be meaningful
+//     (single CJK ideograms are valid: 愛, 悲, 喜 each represent a complete morpheme)
 func isValidWord(word string) bool {
-	if len([]rune(word)) < 2 {
+	runes := []rune(word)
+	if len(runes) == 0 {
+		return false
+	}
+	if len(runes) == 1 && !IsCJK(runes[0]) {
 		return false
 	}
 	if strings.ContainsAny(word, " \t") {
