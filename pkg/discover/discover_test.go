@@ -1,6 +1,9 @@
 package discover
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kak/umcs/pkg/lexdb"
@@ -551,4 +554,106 @@ func TestParseDumpPage_UnknownLang(t *testing.T) {
 	entries := ParseDumpPage(page, []string{"XX"})
 	// Only English section is always parsed; XX section won't exist in wikitext
 	_ = entries // must not panic
+}
+
+// ── ScoreViaDefinition — negation and intensifier ─────────────────────────────
+
+func TestScoreViaDefinition_NegationFlips(t *testing.T) {
+	// "not good" should read as negative, not positive
+	s := ScoreViaDefinition([]string{"not good and not kind"})
+	if s.Polarity == "POSITIVE" {
+		t.Errorf("negated positive indicators should not yield POSITIVE, got %s conf=%.2f", s.Polarity, s.Confidence)
+	}
+}
+
+func TestScoreViaDefinition_StrongIndicatorsReachThreshold(t *testing.T) {
+	// Two strong positive indicators should yield confidence >= 0.60
+	s := ScoreViaDefinition([]string{"feeling of wonderful and magnificent joy"})
+	if s.Polarity != "POSITIVE" {
+		t.Errorf("expected POSITIVE, got %s", s.Polarity)
+	}
+	if s.Confidence < 0.60 {
+		t.Errorf("two strong indicators should reach threshold: got conf=%.2f", s.Confidence)
+	}
+}
+
+func TestScoreViaDefinition_IntensifierRaisesConfidence(t *testing.T) {
+	base := ScoreViaDefinition([]string{"good feeling"})
+	intensified := ScoreViaDefinition([]string{"extremely good feeling"})
+	if intensified.Confidence <= base.Confidence {
+		t.Errorf("intensified (%.2f) should exceed base (%.2f)", intensified.Confidence, base.Confidence)
+	}
+}
+
+func TestScoreViaDefinition_MixedSignalLowConfidence(t *testing.T) {
+	// Balanced pos/neg → confidence should be low (signal is ambiguous)
+	s := ScoreViaDefinition([]string{"wonderful but also terrible, a mix of good and bad"})
+	if s.Confidence > 0.45 {
+		t.Errorf("ambiguous definition should stay below 0.45, got %.2f", s.Confidence)
+	}
+}
+
+// ── SenseCoherent ─────────────────────────────────────────────────────────────
+
+func TestSenseCoherent_MatchingMeaning(t *testing.T) {
+	// "gratitude" definition mentions "grateful" — overlaps with root meaning "grateful or pleasant"
+	if !SenseCoherent([]string{"the quality of being thankful and grateful"}, "grateful or pleasant") {
+		t.Error("overlapping definition should be coherent")
+	}
+}
+
+func TestSenseCoherent_IncoherentPolysemy(t *testing.T) {
+	// EN "gut" (intestine) definition vs root meaning "good"
+	if SenseCoherent(
+		[]string{"the intestinal tract; the stomach and bowels"},
+		"good or pleasant (from Proto-Germanic)",
+	) {
+		t.Error("intestine definition should be incoherent with 'good' root meaning")
+	}
+}
+
+func TestSenseCoherent_ShortDefLenient(t *testing.T) {
+	// Short definitions get benefit of the doubt
+	if !SenseCoherent([]string{"a type of food"}, "good or pleasant") {
+		t.Error("short definition should be treated as coherent (lenient)")
+	}
+}
+
+func TestSenseCoherent_EmptyRootMeaning(t *testing.T) {
+	if !SenseCoherent([]string{"anything at all"}, "") {
+		t.Error("empty root meaning should be treated as coherent")
+	}
+}
+
+// ── StagedWriter ──────────────────────────────────────────────────────────────
+
+func TestStagedWriter_Dedup(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "staged.csv")
+
+	w := NewStagedWriter(path)
+	words := []StagedWord{
+		{Word: "hello", Lang: "EN", RootStr: "test", Score: Score{Polarity: "POSITIVE", Confidence: 0.3}},
+		{Word: "hello", Lang: "EN", RootStr: "test", Score: Score{Polarity: "POSITIVE", Confidence: 0.3}}, // duplicate
+		{Word: "mundo", Lang: "PT", RootStr: "test", Score: Score{Polarity: "NEUTRAL", Confidence: 0.2}},
+	}
+	if err := w.Write(words); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Second writer reads same file — should not re-add existing entries.
+	w2 := NewStagedWriter(path)
+	if err := w2.Write(words); err != nil {
+		t.Fatalf("write2: %v", err)
+	}
+
+	// File should have header + 2 unique rows (hello+mundo), not 4+ rows.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 3 { // header + 2 words
+		t.Errorf("expected 3 lines (header+2 words), got %d:\n%s", len(lines), string(data))
+	}
 }

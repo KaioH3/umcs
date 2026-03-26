@@ -104,6 +104,10 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 		return nil, fmt.Errorf("checkpoint: %w", err)
 	}
 
+	// StagedWriter is created once so the dedup map lives in memory across
+	// all flush calls — O(1) per entry rather than O(n) re-read per flush.
+	stagedW := NewStagedWriter(StagedPath(cfg.OutDir))
+
 	flush := func() {
 		if cfg.DryRun {
 			for _, r := range pendingRoots {
@@ -118,7 +122,7 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 			if err := Flush(pendingRoots, pendingWords, cfg.RootsPath, cfg.WordsPath); err != nil {
 				logf("  warning: flush: %v", err)
 			}
-			if err := WriteStagedCSV(pendingStaged, StagedPath(cfg.OutDir)); err != nil {
+			if err := stagedW.Write(pendingStaged); err != nil {
 				logf("  warning: staged: %v", err)
 			}
 		}
@@ -353,7 +357,9 @@ func classifyBest(rootID uint32, entry *Entry, allWords []seed.Word) Score {
 		return propScore
 	}
 
-	defScore := ScoreViaDefinition(entry.Definitions)
+	// scoreDefinition with cross-lexicon evidence: definition words that match
+	// known lexicon entries contribute polarity evidence at ±0.4 each (capped).
+	defScore := scoreDefinition(entry.Definitions, allWords)
 	morphScore := ScoreViaMorphology(entry.Word)
 
 	return BestScore(propScore, defScore, morphScore)
@@ -403,14 +409,20 @@ func makeWord(rootID uint32, word, lang, norm string, score Score, allWords []se
 //
 // Priority:
 //  1. Exact match against existing words (by phonetic norm + lang) → use their root_id.
-//  2. Etymology ancestor from Wiktionary → stem → Assign (may create new root).
-//  3. Fallback: Assign(phonetic norm of the word) → may create new root.
+//  2. Etymology ancestor from Wiktionary → stem → assignCoherent.
+//  3. Fallback: assignCoherent(phonetic norm of the word).
+//  4. Force-new: all existing matches were semantically incompatible (polysemy).
+//
+// assignCoherent rejects existing root matches whose MeaningEN is semantically
+// incompatible with the entry's definitions. This prevents polysemous phonetic
+// false-positives: e.g. EN "gut" (intestine) being mapped to root "gut" (good),
+// or "but" (concessive) being mapped to root "et" (additive connector).
 func resolveRoot(entry *Entry, lang string, allRoots []seed.Root, allWords []seed.Word) (rootID uint32, rootStr string, isNew bool) {
-	// 1. Look up existing word in lexicon.
 	entryNorm := PhoneticNorm(entry.Word)
+
+	// 1. Existing word in lexicon → use its root directly.
 	for _, w := range allWords {
 		if PhoneticNorm(w.Word) == entryNorm && w.Lang == lang {
-			// Find the root string from existing roots.
 			for _, r := range allRoots {
 				if r.RootID == w.RootID {
 					return w.RootID, r.RootStr, false
@@ -420,18 +432,52 @@ func resolveRoot(entry *Entry, lang string, allRoots []seed.Root, allWords []see
 		}
 	}
 
-	// 2. Use etymology ancestor.
+	// rootMeaningFor returns the MeaningEN for an existing root ID.
+	rootMeaningFor := func(id uint32) string {
+		for _, r := range allRoots {
+			if r.RootID == id {
+				return r.MeaningEN
+			}
+		}
+		return ""
+	}
+
+	// assignCoherent wraps Assign with a sense-coherence check. Returns
+	// (id, isNew, true) on success, or (0, false, false) if the candidate
+	// root's meaning is semantically incompatible with entry.Definitions.
+	assignCoherent := func(key string) (uint32, bool, bool) {
+		id, n := Assign(key, allRoots)
+		if n {
+			return id, true, true // brand-new root — no sense check needed
+		}
+		if !SenseCoherent(entry.Definitions, rootMeaningFor(id)) {
+			return 0, false, false // reject: polysemy mismatch
+		}
+		return id, false, true
+	}
+
+	// 2. Etymology ancestor.
 	if entry.AncestorWord != "" {
-		rs := StemAncestor(entry.AncestorWord)
-		if rs != "" {
-			id, isNew := Assign(rs, allRoots)
-			return id, rs, isNew
+		if rs := StemAncestor(entry.AncestorWord); rs != "" {
+			if id, n, ok := assignCoherent(rs); ok {
+				return id, rs, n
+			}
 		}
 	}
 
-	// 3. Fallback: assign by word norm (may create a new root).
-	id, isNew := Assign(entryNorm, allRoots)
-	return id, entryNorm, isNew
+	// 3. Phonetic norm fallback.
+	if id, n, ok := assignCoherent(entryNorm); ok {
+		return id, entryNorm, n
+	}
+
+	// 4. All existing matches rejected (polysemy) — force a new root.
+	var maxID uint32
+	for _, r := range allRoots {
+		if r.RootID > maxID {
+			maxID = r.RootID
+		}
+	}
+	return maxID + 1, entryNorm, true
 }
 
 func isTargetLang(lang string, targets []string) bool {

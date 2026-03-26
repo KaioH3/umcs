@@ -158,16 +158,26 @@ func appendWords(words []seed.Word, path string) error {
 	return w.Error()
 }
 
-// WriteStagedCSV appends low-confidence words to the staging file for manual review.
-// Deduplicates by (word, lang) against existing entries to avoid accumulating duplicates
-// across multiple discover runs.
-func WriteStagedCSV(staged []StagedWord, path string) error {
-	if len(staged) == 0 {
-		return nil
-	}
+// StagedWriter appends low-confidence words to staged.csv with O(1) duplicate
+// detection across multiple flush calls within the same pipeline run.
+//
+// Use NewStagedWriter once at the start of a run, then call Write on each flush.
+// This avoids the O(n²) re-read that would occur if the file were parsed on
+// every flush call.
+type StagedWriter struct {
+	path     string
+	existing map[string]bool // keyed by word+"\x00"+lang
+	ready    bool            // header already written
+}
 
-	// Load existing (word,lang) keys to skip duplicates.
-	existing := map[string]bool{}
+// NewStagedWriter initialises a StagedWriter for path. If the file already
+// exists its (word, lang) pairs are loaded into the dedup set so re-runs do
+// not accumulate duplicates.
+func NewStagedWriter(path string) *StagedWriter {
+	sw := &StagedWriter{
+		path:     path,
+		existing: make(map[string]bool),
+	}
 	if data, err := os.ReadFile(path); err == nil {
 		r := csv.NewReader(strings.NewReader(string(data)))
 		r.FieldsPerRecord = -1
@@ -176,30 +186,38 @@ func WriteStagedCSV(staged []StagedWord, path string) error {
 			if i == 0 || len(rec) < 2 {
 				continue
 			}
-			existing[rec[0]+"_"+rec[1]] = true
+			sw.existing[rec[0]+"\x00"+rec[1]] = true
 		}
+		sw.ready = len(sw.existing) > 0
 	}
+	return sw
+}
 
-	writeHeader := len(existing) == 0
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
+// Write appends new staged words to the file, skipping duplicates.
+func (sw *StagedWriter) Write(staged []StagedWord) error {
+	if len(staged) == 0 {
+		return nil
+	}
+	f, err := os.OpenFile(sw.path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 	w := csv.NewWriter(f)
-	if writeHeader {
+	if !sw.ready {
 		_ = w.Write([]string{
 			"word", "lang", "root_str", "proposed_root_id",
 			"polarity", "intensity", "role", "confidence", "source",
 			"definition",
 		})
+		sw.ready = true
 	}
 	for _, s := range staged {
-		key := s.Word + "_" + s.Lang
-		if existing[key] {
+		key := s.Word + "\x00" + s.Lang
+		if sw.existing[key] {
 			continue
 		}
-		existing[key] = true
+		sw.existing[key] = true
 		_ = w.Write([]string{
 			s.Word, s.Lang, s.RootStr,
 			fmt.Sprintf("%d", s.ProposedRootID),
@@ -211,6 +229,12 @@ func WriteStagedCSV(staged []StagedWord, path string) error {
 	}
 	w.Flush()
 	return w.Error()
+}
+
+// WriteStagedCSV is a convenience wrapper for one-shot staged writes (e.g. tests).
+// For pipeline use prefer StagedWriter to avoid O(n²) re-reads.
+func WriteStagedCSV(staged []StagedWord, path string) error {
+	return NewStagedWriter(path).Write(staged)
 }
 
 // StagedWord is a candidate word that did not meet the confidence threshold.
