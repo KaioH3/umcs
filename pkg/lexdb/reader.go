@@ -414,6 +414,22 @@ func (l *Lexicon) Synonym(r *RootRecord) *RootRecord {
 	return l.LookupRoot(r.SynonymRootID)
 }
 
+// RootCanonicalWord returns the first WordRecord for rootID by index order.
+// This gives the "canonical" representative of a root family for feature
+// extraction (e.g. looking up antonym or hypernym polarity). Returns nil if no
+// words exist for that root.
+func (l *Lexicon) RootCanonicalWord(rootID uint32) *WordRecord {
+	root := l.LookupRoot(rootID)
+	if root == nil || root.WordCount == 0 {
+		return nil
+	}
+	idx := int(root.FirstWordIdx)
+	if idx >= len(l.Words) {
+		return nil
+	}
+	return &l.Words[idx]
+}
+
 // EtymologyChain traces the etymology from a root back to its ancestor.
 // Returns the chain from root → parent → grandparent → ... (proto-language).
 func (l *Lexicon) EtymologyChain(rootID uint32) []RootRecord {
