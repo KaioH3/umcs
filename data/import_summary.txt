@@ -1,0 +1,7 @@
+UMCS Import Summary
+==================
+Total entries imported: 515030
+Sources: 81Lang, AFINN, BingLiu, NRC-EmoLex, NRC-VAD, SentiWordNet, VADER, Warriner
+Languages: 62
+IPA coverage: 99014/515030 (19.2%)
+Polarity: POS=132108 NEG=177070 NEU=203456 AMB=2396
