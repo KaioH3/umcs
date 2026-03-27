@@ -16,18 +16,26 @@
 package main
 
 import (
+	"bufio"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 
+	"os/exec"
+
 	"github.com/kak/umcs/pkg/analyze"
 	"github.com/kak/umcs/pkg/api"
+	"github.com/kak/umcs/pkg/classify"
 	"github.com/kak/umcs/pkg/discover"
+	"github.com/kak/umcs/pkg/ga"
 	"github.com/kak/umcs/pkg/infer"
 	"github.com/kak/umcs/pkg/lexdb"
 	"github.com/kak/umcs/pkg/morpheme"
 	"github.com/kak/umcs/pkg/phon"
+	"github.com/kak/umcs/pkg/rl"
 	"github.com/kak/umcs/pkg/seed"
 	"github.com/kak/umcs/pkg/sentiment"
 	"github.com/kak/umcs/pkg/tokenizer"
@@ -64,6 +72,18 @@ func main() {
 		cmdDiscover(os.Args[2:])
 	case "import":
 		cmdImport(os.Args[2:])
+	case "train":
+		cmdTrain(os.Args[2:])
+	case "predict":
+		cmdPredict(os.Args[2:])
+	case "feedback":
+		cmdFeedback(os.Args[2:])
+	case "evolve":
+		cmdEvolve(os.Args[2:])
+	case "export-c":
+		cmdExportC(os.Args[2:])
+	case "stage-review":
+		cmdStageReview(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		usage()
@@ -671,6 +691,8 @@ func cmdDiscover(args []string) {
 	limit := 200
 	dryRun := false
 	reset := false
+	reexpand := false
+	workers := 1
 	outDir := "data"
 	rootsPath := "data/roots.csv"
 	wordsPath := "data/words.csv"
@@ -698,6 +720,15 @@ func cmdDiscover(args []string) {
 			dryRun = true
 		case "--reset":
 			reset = true
+		case "--reexpand":
+			reexpand = true
+		case "--workers":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil {
+					workers = n
+				}
+				i++
+			}
 		case "--out":
 			outDir = args[i+1]; i++
 		case "--roots":
@@ -768,6 +799,8 @@ func cmdDiscover(args []string) {
 		Limit:     limit,
 		DryRun:    dryRun,
 		Reset:     reset,
+		Reexpand:  reexpand,
+		Workers:   workers,
 		OutDir:    outDir,
 		RootsPath: rootsPath,
 		WordsPath: wordsPath,
@@ -920,6 +953,719 @@ func cmdImport(args []string) {
 	}
 }
 
+// ── cmdTrain ──────────────────────────────────────────────────────────────────
+
+func cmdTrain(args []string) {
+	lexPath := defaultLexicon
+	dataPath := ""
+	outPath := "models/classifier.bin"
+	valSplit := 0.2
+	epochs := 50
+	autoGen := false
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--lexicon":
+			if i+1 < len(args) {
+				lexPath = args[i+1]
+				i++
+			}
+		case "--data":
+			if i+1 < len(args) {
+				dataPath = args[i+1]
+				i++
+			}
+		case "--out":
+			if i+1 < len(args) {
+				outPath = args[i+1]
+				i++
+			}
+		case "--val-split":
+			if i+1 < len(args) {
+				v, err := strconv.ParseFloat(args[i+1], 64)
+				if err == nil {
+					valSplit = v
+				}
+				i++
+			}
+		case "--epochs":
+			if i+1 < len(args) {
+				v, err := strconv.Atoi(args[i+1])
+				if err == nil {
+					epochs = v
+				}
+				i++
+			}
+		case "--auto":
+			autoGen = true
+		}
+	}
+
+	_ = dataPath // future: load from JSONL
+
+	lex, err := lexdb.Load(lexPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load lexicon: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !autoGen {
+		autoGen = true // default to auto when no data path given
+	}
+
+	examples := classify.GenerateFromLexicon(lex)
+	if len(examples) == 0 {
+		fmt.Fprintln(os.Stderr, "no training examples generated")
+		os.Exit(1)
+	}
+
+	// Root-stratified split — cognates (words sharing root_id) go entirely to
+	// train or val, preventing trivial generalisation via cognate leakage.
+	train, val := classify.SplitByRoot(examples, valSplit)
+	fmt.Printf("Training: %d examples  Val: %d examples (root-stratified, seed=42)\n", len(train), len(val))
+
+	// Majority-class baseline — lower bound any real model must beat.
+	majorityF1 := classify.MajorityClassF1(val)
+	fmt.Printf("Baseline (majority class):   F1=%.3f\n", majorityF1)
+	fmt.Printf("Baseline (random uniform):   F1=0.333\n")
+
+	clf := classify.New(classify.NFeatures, classify.DefaultClasses)
+
+	for epoch := 1; epoch <= epochs; epoch++ {
+		for _, ex := range train {
+			clf.TrainStep(ex.Features, ex.LabelIdx)
+		}
+		if epoch%10 == 0 || epoch == epochs {
+			f1 := classify.F1Macro(clf, val)
+			acc := classify.Accuracy(clf, val)
+			pct := 0.0
+			if majorityF1 > 0 {
+				pct = (f1/majorityF1 - 1) * 100
+			}
+			fmt.Printf("  epoch %3d/%d  F1=%.3f  acc=%.3f  steps=%d  (+%.1f%% vs majority)\n",
+				epoch, epochs, f1, acc, clf.Step, pct)
+		}
+	}
+
+	if err := os.MkdirAll("models", 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "mkdir models: %v\n", err)
+		os.Exit(1)
+	}
+	if err := clf.Save(outPath); err != nil {
+		fmt.Fprintf(os.Stderr, "save classifier: %v\n", err)
+		os.Exit(1)
+	}
+
+	f1Final := classify.F1Macro(clf, val)
+	perClass := classify.F1PerClass(clf, val)
+	fmt.Printf("Saved → %s\n", outPath)
+	fmt.Printf("  Root-stratified val F1 = %.3f  (+%.1f%% vs majority class baseline)\n",
+		f1Final, func() float64 {
+			if majorityF1 > 0 {
+				return (f1Final/majorityF1 - 1) * 100
+			}
+			return 0
+		}())
+	fmt.Printf("  Per-class: NEG=%.3f  NEU=%.3f  POS=%.3f\n",
+		perClass["NEGATIVE"], perClass["NEUTRAL"], perClass["POSITIVE"])
+	fmt.Printf("  No polarity leak (FPolarity zeroed in training features)\n")
+}
+
+// ── cmdPredict ────────────────────────────────────────────────────────────────
+
+func cmdPredict(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: lexsent predict <word> [<lang>] [--model PATH] [--lexicon PATH]")
+		os.Exit(1)
+	}
+	word := args[0]
+	lang := "EN"
+	modelPath := "models/classifier.bin"
+	lexPath := defaultLexicon
+
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--model":
+			if i+1 < len(args) {
+				modelPath = args[i+1]
+				i++
+			}
+		case "--lexicon":
+			if i+1 < len(args) {
+				lexPath = args[i+1]
+				i++
+			}
+		default:
+			if !strings.HasPrefix(args[i], "--") {
+				lang = args[i]
+			}
+		}
+	}
+
+	lex, err := lexdb.Load(lexPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load lexicon: %v\n", err)
+		os.Exit(1)
+	}
+
+	clf, err := classify.Load(modelPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load model: %v\n  → run 'lexsent train --auto' first\n", err)
+		os.Exit(1)
+	}
+
+	agent := rl.New(clf)
+	_ = agent.LoadState(modelPath) // ignore error: starts fresh if no sidecar
+
+	f, ok := classify.ExtractFromLexicon(lex, word, lang)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "word %q (%s) not found in lexicon\n", word, lang)
+		os.Exit(1)
+	}
+
+	class, conf := agent.Act(f)
+	rl.RecordLast(f, class)
+	_ = agent.SaveState(modelPath) // persist LastPrediction for feedback cmd
+
+	// Build rich output line
+	wr := lex.LookupWordInLang(word, lang)
+	extra := ""
+	if wr != nil {
+		root := lex.LookupRoot(wr.RootID)
+		if root != nil {
+			extra += fmt.Sprintf("  root=%-8s", lex.RootStr(root))
+			if ant := lex.Antonym(root); ant != nil {
+				extra += fmt.Sprintf("  ant=%-8s", lex.RootStr(ant))
+			}
+		}
+		pron := lex.WordPron(wr)
+		if pron != "" {
+			extra += fmt.Sprintf("  IPA=%s", pron)
+		}
+	}
+
+	fmt.Printf("%s (%.1f%%)%s\n", class, conf*100, extra)
+}
+
+// ── cmdFeedback ───────────────────────────────────────────────────────────────
+
+func cmdFeedback(args []string) {
+	modelPath := "models/classifier.bin"
+	label := ""
+	ok := false
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--ok":
+			ok = true
+		case "--label":
+			if i+1 < len(args) {
+				label = strings.ToUpper(args[i+1])
+				i++
+			}
+		case "--model":
+			if i+1 < len(args) {
+				modelPath = args[i+1]
+				i++
+			}
+		}
+	}
+
+	if !ok && label == "" {
+		fmt.Fprintln(os.Stderr, "usage: lexsent feedback [--ok | --label LABEL] [--model PATH]")
+		os.Exit(1)
+	}
+
+	clf, err := classify.Load(modelPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load model: %v\n", err)
+		os.Exit(1)
+	}
+
+	agent := rl.New(clf)
+	if err := agent.LoadState(modelPath); err != nil {
+		fmt.Fprintf(os.Stderr, "load agent state: %v\n", err)
+		os.Exit(1)
+	}
+
+	if rl.LastPrediction == nil {
+		fmt.Fprintln(os.Stderr, "no pending prediction — run 'lexsent predict <word>' first")
+		os.Exit(1)
+	}
+
+	predicted := rl.LastPrediction.Predicted
+	correct := predicted
+	reward := 1.0
+
+	if ok {
+		correct = predicted
+		reward = 1.0
+	} else {
+		correct = label
+		if correct != predicted {
+			reward = -1.0
+		}
+	}
+
+	agent.Observe(rl.Feedback{
+		Features:  rl.LastPrediction.Features,
+		Predicted: predicted,
+		Correct:   correct,
+		Reward:    reward,
+	})
+	agent.Learn()
+
+	if err := clf.Save(modelPath); err != nil {
+		fmt.Fprintf(os.Stderr, "save model: %v\n", err)
+		os.Exit(1)
+	}
+	if err := agent.SaveState(modelPath); err != nil {
+		fmt.Fprintf(os.Stderr, "save agent state: %v\n", err)
+		os.Exit(1)
+	}
+
+	if reward > 0 {
+		fmt.Printf("Reward +1 applied  (predicted=%s ✓)\n", predicted)
+	} else {
+		fmt.Printf("Reward -1, corrective update  (predicted=%s → correct=%s)\n", predicted, correct)
+	}
+}
+
+// ── cmdEvolve ─────────────────────────────────────────────────────────────────
+
+func cmdEvolve(args []string) {
+	modelPath := "models/classifier.bin"
+	lexPath := defaultLexicon
+	generations := 50
+	popSize := 32
+	valSplit := 0.2
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--model":
+			if i+1 < len(args) {
+				modelPath = args[i+1]
+				i++
+			}
+		case "--lexicon":
+			if i+1 < len(args) {
+				lexPath = args[i+1]
+				i++
+			}
+		case "--generations":
+			if i+1 < len(args) {
+				v, err := strconv.Atoi(args[i+1])
+				if err == nil {
+					generations = v
+				}
+				i++
+			}
+		case "--pop":
+			if i+1 < len(args) {
+				v, err := strconv.Atoi(args[i+1])
+				if err == nil {
+					popSize = v
+				}
+				i++
+			}
+		}
+	}
+
+	lex, err := lexdb.Load(lexPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load lexicon: %v\n", err)
+		os.Exit(1)
+	}
+
+	examples := classify.GenerateFromLexicon(lex)
+	train, val := classify.SplitByRoot(examples, valSplit)
+	fmt.Printf("GA evolution: pop=%d generations=%d train=%d val=%d\n",
+		popSize, generations, len(train), len(val))
+
+	pop := ga.New(popSize, 42)
+	pop.TrainSteps = 150
+
+	best := pop.Run(train, val, generations, func(gen int, bestF1 float64) {
+		fmt.Printf("  gen %3d/%d  best F1=%.4f\n", gen, generations, bestF1)
+	})
+
+	// Apply best weights to the saved classifier
+	clf, err := classify.Load(modelPath)
+	if err != nil {
+		// No model yet — create one
+		clf = classify.New(classify.NFeatures, classify.DefaultClasses)
+	}
+	clf.FeatureWeights = best.Weights
+
+	// Retrain with the evolved weights
+	for _, ex := range train {
+		clf.TrainStep(ex.Features, ex.LabelIdx)
+	}
+
+	if err := os.MkdirAll("models", 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "mkdir models: %v\n", err)
+		os.Exit(1)
+	}
+	if err := clf.Save(modelPath); err != nil {
+		fmt.Fprintf(os.Stderr, "save model: %v\n", err)
+		os.Exit(1)
+	}
+
+	finalF1 := classify.F1Macro(clf, val)
+	fmt.Printf("Best chromosome F1=%.4f → saved to %s  (final F1=%.4f)\n",
+		best.Fitness, modelPath, finalF1)
+}
+
+// ── cmdExportC ────────────────────────────────────────────────────────────────
+
+func cmdExportC(args []string) {
+	outDir := "."
+	headerDir := "."
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			if i+1 < len(args) {
+				outDir = args[i+1]
+				i++
+			}
+		case "--header":
+			if i+1 < len(args) {
+				headerDir = args[i+1]
+				i++
+			}
+		}
+	}
+
+	fmt.Println("Building libumcs.so ...")
+	soPath := outDir + "/libumcs.so"
+	hPath := headerDir + "/umcs.h"
+
+	// Build the shared library via go build -buildmode=c-shared
+	// We use os/exec here so the user sees the compiler output.
+	buildArgs := []string{
+		"build", "-buildmode=c-shared",
+		"-o", soPath,
+		"github.com/kak/umcs/pkg/capi",
+	}
+	cmd := exec.Command("go", buildArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "go build failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	// The c-shared build also auto-generates a .h — copy it if not already at hPath.
+	autoH := soPath[:len(soPath)-3] + ".h"
+	if autoH != hPath {
+		data, err := os.ReadFile(autoH)
+		if err == nil {
+			_ = os.WriteFile(hPath, data, 0o644)
+		}
+	}
+
+	fmt.Printf("OK  → %s\n    → %s\n", soPath, hPath)
+}
+
+// ── cmdStageReview ────────────────────────────────────────────────────────────
+//
+// Reads staged.csv (low-confidence candidates from discover/import runs) and
+// either auto-accepts entries above a confidence threshold or prompts
+// interactively for manual review. Accepted words are appended to words.csv
+// and the lexicon is rebuilt.
+//
+// Usage:
+//
+//	lexsent stage-review [--staged PATH] [--words PATH] [--roots PATH]
+//	                     [--min-conf 0.60] [--batch 50] [--auto] [--dry-run]
+func cmdStageReview(args []string) {
+	stagedPath := "data/staged.csv"
+	wordsPath := "data/words.csv"
+	rootsPath := "data/roots.csv"
+	lexPath := defaultLexicon
+	minConf := 0.60
+	batch := 50
+	auto := false
+	dryRun := false
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--staged":
+			if i+1 < len(args) {
+				stagedPath = args[i+1]
+				i++
+			}
+		case "--words":
+			if i+1 < len(args) {
+				wordsPath = args[i+1]
+				i++
+			}
+		case "--roots":
+			if i+1 < len(args) {
+				rootsPath = args[i+1]
+				i++
+			}
+		case "--lexicon":
+			if i+1 < len(args) {
+				lexPath = args[i+1]
+				i++
+			}
+		case "--min-conf":
+			if i+1 < len(args) {
+				v, err := strconv.ParseFloat(args[i+1], 64)
+				if err == nil {
+					minConf = v
+				}
+				i++
+			}
+		case "--batch":
+			if i+1 < len(args) {
+				v, err := strconv.Atoi(args[i+1])
+				if err == nil {
+					batch = v
+				}
+				i++
+			}
+		case "--auto":
+			auto = true
+		case "--dry-run":
+			dryRun = true
+		}
+	}
+
+	// Load existing words to compute proper variant numbers.
+	allWords, err := seed.LoadWords(wordsPath)
+	if err != nil {
+		fatalf("load words: %v", err)
+	}
+	allRoots, err := seed.LoadRoots(rootsPath)
+	if err != nil {
+		fatalf("load roots: %v", err)
+	}
+	_ = allRoots
+
+	// Read staged.csv.
+	f, err := os.Open(stagedPath)
+	if err != nil {
+		fatalf("open staged: %v", err)
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.TrimLeadingSpace = true
+	header, err := r.Read()
+	if err != nil {
+		fatalf("read staged header: %v", err)
+	}
+	// Expected: word,lang,root_str,proposed_root_id,polarity,intensity,role,confidence,source,definition
+	colIdx := make(map[string]int)
+	for i, h := range header {
+		colIdx[strings.TrimSpace(h)] = i
+	}
+	col := func(row []string, name string) string {
+		idx, ok := colIdx[name]
+		if !ok || idx >= len(row) {
+			return ""
+		}
+		return strings.TrimSpace(row[idx])
+	}
+
+	type candidate struct {
+		word, lang, polarity, intensity, role, source, definition string
+		rootID                                                     uint32
+		confidence                                                 float64
+	}
+	var candidates []candidate
+	for {
+		row, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+		conf, _ := strconv.ParseFloat(col(row, "confidence"), 64)
+		if conf < minConf {
+			continue
+		}
+		rid, _ := strconv.ParseUint(col(row, "proposed_root_id"), 10, 32)
+		candidates = append(candidates, candidate{
+			word:       col(row, "word"),
+			lang:       col(row, "lang"),
+			polarity:   col(row, "polarity"),
+			intensity:  col(row, "intensity"),
+			role:       col(row, "role"),
+			source:     col(row, "source"),
+			definition: col(row, "definition"),
+			rootID:     uint32(rid),
+			confidence: conf,
+		})
+	}
+
+	fmt.Printf("stage-review\n")
+	fmt.Printf("  Staged file: %s\n", stagedPath)
+	fmt.Printf("  Candidates ≥ %.2f conf: %d\n", minConf, len(candidates))
+	fmt.Printf("  Mode: %s\n\n", func() string {
+		if auto {
+			return "AUTO (accept all above threshold)"
+		}
+		return fmt.Sprintf("INTERACTIVE (batches of %d)", batch)
+	}())
+
+	if len(candidates) == 0 {
+		fmt.Println("No candidates above confidence threshold.")
+		return
+	}
+
+	// Build known-word set to skip duplicates.
+	known := make(map[string]bool, len(allWords))
+	for _, w := range allWords {
+		known[w.Norm+"_"+w.Lang] = true
+	}
+
+	var accepted []seed.Word
+	stdin := bufio.NewReader(os.Stdin)
+
+	accept := func(c candidate) {
+		norm := discover.PhoneticNorm(c.word)
+		key := norm + "_" + c.lang
+		if known[key] {
+			return
+		}
+		pol := c.polarity
+		if pol == "" {
+			pol = "NEUTRAL"
+		}
+		intensity := c.intensity
+		if intensity == "" {
+			intensity = "NONE"
+		}
+		role := c.role
+		if role == "" {
+			role = "EVALUATION"
+		}
+		packed, err := sentiment.Pack(pol, intensity, role, "GENERAL", nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  pack error %q: %v\n", c.word, err)
+			return
+		}
+		variant := discover.NextVariant(c.rootID, allWords)
+		wordID, err := morpheme.MakeWordID(c.rootID, variant)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  variant overflow %q: %v\n", c.word, err)
+			return
+		}
+		w := seed.Word{
+			WordID:    wordID,
+			RootID:    c.rootID,
+			Variant:   variant,
+			Word:      c.word,
+			Lang:      c.lang,
+			Norm:      norm,
+			Sentiment: packed,
+		}
+		accepted = append(accepted, w)
+		allWords = append(allWords, w)
+		known[key] = true
+		fmt.Printf("  + %-20s [%s] pol=%-8s conf=%.0f%% src=%s\n",
+			c.word, c.lang, pol, c.confidence*100, c.source)
+	}
+
+	if auto {
+		for _, c := range candidates {
+			accept(c)
+		}
+	} else {
+		for i := 0; i < len(candidates); i += batch {
+			end := i + batch
+			if end > len(candidates) {
+				end = len(candidates)
+			}
+			slice := candidates[i:end]
+			fmt.Printf("── Batch %d/%d ─────────────────────────\n",
+				i/batch+1, (len(candidates)+batch-1)/batch)
+			for j, c := range slice {
+				fmt.Printf("  [%d] %-20s [%s] pol=%-8s conf=%.0f%%  %s\n",
+					j+1, c.word, c.lang, c.polarity, c.confidence*100, c.definition)
+			}
+			fmt.Print("\n  [y]es-all  [n]o-all  [a]uto-rest  [q]uit  or number to toggle: ")
+			line, _ := stdin.ReadString('\n')
+			line = strings.TrimSpace(line)
+			switch line {
+			case "y", "yes":
+				for _, c := range slice {
+					accept(c)
+				}
+			case "n", "no":
+				fmt.Printf("  Skipped %d entries.\n", len(slice))
+			case "a", "auto":
+				for _, c := range candidates[i:] {
+					accept(c)
+				}
+				break
+			case "q", "quit":
+				fmt.Println("  Stopped.")
+				goto done
+			default:
+				fmt.Printf("  Skipped batch.\n")
+			}
+			fmt.Println()
+		}
+	}
+done:
+
+	fmt.Printf("\nAccepted: %d new words\n", len(accepted))
+	if len(accepted) == 0 || dryRun {
+		if dryRun {
+			fmt.Println("Dry run — no changes written.")
+		}
+		return
+	}
+
+	// Append accepted words to words.csv.
+	wf, err := os.OpenFile(wordsPath, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		fatalf("open words for append: %v", err)
+	}
+	w := csv.NewWriter(wf)
+	for _, word := range accepted {
+		w.Write([]string{
+			strconv.FormatUint(uint64(word.WordID), 10),
+			strconv.FormatUint(uint64(word.RootID), 10),
+			strconv.FormatUint(uint64(word.Variant), 10),
+			word.Word,
+			word.Lang,
+			word.Norm,
+			strconv.FormatUint(uint64(word.Sentiment), 10),
+			"0", // FreqRank
+			"0", // Flags
+			"",  // Pron
+		})
+	}
+	w.Flush()
+	wf.Close()
+	if err := w.Error(); err != nil {
+		fatalf("write words csv: %v", err)
+	}
+	fmt.Printf("Written → %s\n", wordsPath)
+
+	// Rebuild lexicon.
+	fmt.Print("Rebuilding lexicon... ")
+	roots, err := seed.LoadRoots(rootsPath)
+	if err != nil {
+		fatalf("load roots: %v", err)
+	}
+	words, err := seed.LoadWords(wordsPath)
+	if err != nil {
+		fatalf("reload words: %v", err)
+	}
+	if _, err := lexdb.Build(roots, words, lexPath); err != nil {
+		fatalf("build lexicon: %v", err)
+	}
+	fmt.Printf("Lexicon: %d roots, %d words\n", len(roots), len(words))
+}
+
 func usage() {
 	fmt.Println(`lexsent — Universal Morpheme Coordinate System
 
@@ -934,5 +1680,12 @@ Commands:
   stats    [--productive]
   serve    [--port PORT]
   discover [--expand | --seed word1,word2] [--lang PT,EN,...] [--depth N] [--limit N] [--dry-run] [--reset] [--verbose]
-  import   --dump PATH.xml.bz2 [--lang PT,EN,...] [--limit N] [--dry-run] [--verbose] [--batch N]`)
+  import   --dump PATH.xml.bz2 [--lang PT,EN,...] [--limit N] [--dry-run] [--verbose] [--batch N]
+
+ML Commands:
+  train    [--auto] [--lexicon PATH] [--out models/classifier.bin] [--val-split 0.2] [--epochs 50]
+  predict  <word> [<lang>] [--model models/classifier.bin] [--lexicon PATH]
+  feedback [--ok | --label LABEL] [--model PATH]
+  evolve   [--generations 50] [--pop 32] [--model PATH] [--lexicon PATH]
+  export-c [--out DIR] [--header DIR]`)
 }
