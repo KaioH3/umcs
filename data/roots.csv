@@ -5,12 +5,12 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym
 4,mal,LATIN,bad or evil,from malus (bad),0,0,3,0
 5,fort,LATIN,strong or powerful,from fortis (strong),0,0,0,0
 6,liber,LATIN,free,from liber (free),0,0,0,0
-7,am,LATIN,to love,from amare (to love),0,3,0,0
+7,am,LATIN,to love,from amare (to love),0,3,37,115
 8,trist,LATIN,sad,from tristis (sad),0,0,35,75
 9,grat,LATIN,grateful or pleasant,from gratus (grateful),0,3,0,0
 10,terr,LATIN,fear or dread,from terror,0,0,0,40
 11,viol,LATIN,violence or force,from violentus,0,4,12,0
-12,pac,LATIN,peace,from pax/pacis,0,0,11,0
+12,pac,LATIN,peace,from pax/pacis,0,3,11,114
 13,just,LATIN,just or right,from justus,0,3,46,0
 14,sol,LATIN,alone or sole,from solus,0,0,15,0
 15,greg,LATIN,group or flock,from grex/gregis,0,0,14,0
@@ -30,24 +30,24 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym
 29,cap,LATIN,to take or seize,from capere,0,0,0,0
 30,cred,LATIN,to believe or trust,from credere,0,0,73,0
 31,excel,LATIN,to surpass or excel,from excellere,0,3,72,71
-32,terrib,LATIN,terrible or causing terror,derived from terrere,10,4,0,0
-33,horr,LATIN,horror or dread,from horrere,0,10,0,0
-34,bel,LATIN,beautiful,from bellus,0,3,0,0
+32,terrib,LATIN,terrible or causing terror,derived from terrere,10,4,3,33
+33,horr,LATIN,horror or dread,from horrere,0,10,3,32
+34,bel,LATIN,beautiful,from bellus,0,3,4,78
 35,felic,LATIN,happy or fortunate,from felix/felicis,0,3,8,76
 36,serv,LATIN,to serve or preserve,from servire,0,0,0,0
-37,ir,LATIN,anger or wrath,from ira (anger),0,0,0,77
-38,dolor,LATIN,pain or grief,from dolor,0,8,0,93
+37,ir,LATIN,anger or wrath,from ira (anger),0,4,7,77
+38,dolor,LATIN,pain or grief,from dolor,0,8,39,93
 39,sper,LATIN,hope,from sperare,0,3,73,81
-40,tim,LATIN,fear,from timere,0,0,0,10
+40,tim,LATIN,fear,from timere,0,4,0,10
 41,cur,LATIN,to take care or run,from cura/currere,0,0,0,0
 42,nov,LATIN,new,from novus,0,0,0,0
-43,vit,LATIN,life,from vita,0,0,44,0
-44,mort,LATIN,death,from mors/mortis,0,0,43,0
+43,vit,LATIN,life,from vita,0,3,44,0
+44,mort,LATIN,death,from mors/mortis,0,4,43,0
 45,laud,LATIN,praise,from laudare,0,3,46,0
 46,culp,LATIN,fault or blame,from culpa,0,4,45,0
-47,litig,LATIN,dispute or litigation,from litigare,13,0,0,0
-48,fid,LATIN,faith or trust,from fides,30,0,73,0
-49,clar,LATIN,clear or bright,from clarus,0,0,0,0
+47,litig,LATIN,dispute or litigation,from litigare,13,4,12,0
+48,fid,LATIN,faith or trust,from fides,30,3,73,0
+49,clar,LATIN,clear or bright,from clarus,0,3,0,0
 50,magn,LATIN,great or large,from magnus,0,0,51,0
 51,parv,LATIN,small,from parvus,0,0,50,0
 52,plen,LATIN,full,from plenus,0,0,53,0
@@ -56,9 +56,9 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym
 55,lent,LATIN,slow,from lentus,0,0,54,0
 56,gut,PROTO_GERMANIC,good,Proto-Germanic gutaz → EN good / DE gut,0,0,0,3
 57,libh,PROTO_GERMANIC,love,Proto-Germanic lubją → EN love / DE Liebe,0,0,0,7
-58,heil,PROTO_GERMANIC,holy or whole,Proto-Germanic hailagaz → EN holy / DE heilig,0,0,0,0
-59,ang,PROTO_GERMANIC,narrow or painful,Proto-Germanic *angaz → EN anguish / DE eng,0,0,0,0
-60,stark,PROTO_GERMANIC,strong or rigid,Proto-Germanic starkaz → EN stark / DE stark,0,0,0,0
+58,heil,PROTO_GERMANIC,holy or whole,Proto-Germanic hailagaz → EN holy / DE heilig,0,3,0,0
+59,ang,PROTO_GERMANIC,narrow or painful,Proto-Germanic *angaz → EN anguish / DE eng,0,4,0,0
+60,stark,PROTO_GERMANIC,strong or rigid,Proto-Germanic starkaz → EN stark / DE stark,0,5,0,0
 61,ne,PROTO_INDO_EUROPEAN,negation particle,PIE *ne → not/não/no/nicht/non/non,0,0,0,0
 62,vald,PROTO_GERMANIC,very or powerful,PIE *wal → very/sehr/muy/molto,0,0,0,0
 63,et,LATIN,and or connector,from et/et → and/e/y/und,0,0,0,0
@@ -68,7 +68,7 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym
 67,cons,LATIN,consecutive connector,from consequi → therefore/portanto/also/donc — marks consequence,0,0,0,0
 68,temp,LATIN,temporal connector,from tempus → when/quando/wenn/quand — marks time clauses,0,0,0,0
 69,vel,LATIN,to want or wish,from velle → want/querer/wollen/vouloir — volitional verbs,0,0,0,0
-70,cert,LATIN,certain or sure,from certus → certain/certo/sicher/sure — epistemic markers,0,0,73,0
+70,cert,LATIN,certain or sure,from certus → certain/certo/sicher/sure — epistemic markers,0,3,73,0
 71,optim,LATIN,optimal or best,from optimus → ótimo/optimal/best — positive superlative scale,0,3,72,31
 72,pess,LATIN,worst or pessimal,from pessimus → péssimo/worst/pésimo — negative extreme scale,0,4,71,0
 73,dub,LATIN,doubt or uncertain,from dubius → doubt/dúvida/duda — epistemic uncertainty,0,0,70,0
@@ -86,7 +86,7 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym
 85,putan,LATIN,insult/vulgar intensifier,from Latin puta (girl/whore) — puta/putain/puttana — strongest negative intensifier in Romance,0,0,0,0
 86,spec,LATIN,to look or observe,from spectare/specere — spectacular/especial/special/spécial,0,0,0,0
 87,grad,LATIN,step or degree,from gradus — gradual/grade/grado/grau — progression root,0,0,0,0
-88,lux,LATIN,light or brightness,from lux/lucis — luz/luce/lucid — luminosity root,0,0,0,0
+88,lux,LATIN,light or brightness,from lux/lucis — luz/luce/lucid — luminosity root,0,3,0,0
 89,corp,LATIN,body or substance,from corpus/corporis — corpo/cuerpo/corps/Körper,0,0,0,0
 90,man,LATIN,hand or agency,from manus — mão/mano/main — manual root,0,0,0,0
 91,aqua,LATIN,water,from aqua — água/agua/acqua/eau — universal water root,0,0,0,0
@@ -99,14 +99,14 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym
 98,cru,LATIN,raw or cruel,from crudus/crudelis — cruel/crueldade/cruauté,0,4,99,0
 99,dulc,LATIN,sweet or pleasant,from dulcis — doce/dulce/doux/dolce,0,3,98,0
 100,san,LATIN,healthy or whole,from sanus — são/sano/sain/sane,0,43,102,0
-101,miser,LATIN,wretched or pitiable,from miser — mísero/miserable/misère/misery,0,4,0,0
-102,febr,LATIN,fever or heat,from febris — febre/fiebre/fièvre/fever,0,0,100,0
+101,miser,LATIN,wretched or pitiable,from miser — mísero/miserable/misère/misery,0,4,3,0
+102,febr,LATIN,fever or heat,from febris — febre/fiebre/fièvre/fever,0,4,100,0
 103,frat,LATIN,brother or fraternal bond,from frater — frère/fratello/fraternidade,0,0,0,0
 104,patr,LATIN,father or homeland,from pater/patria — pai/père/pátria/patriot,0,0,0,0
 105,sacr,LATIN,sacred or devoted,from sacer — sagrado/sacré/sacro/sacred,0,0,0,0
-106,cord,LATIN,heart or core,from cor/cordis — coração/corazón/cœur/cuore/cordial,0,0,0,0
+106,cord,LATIN,heart or core,from cor/cordis — coração/corazón/cœur/cuore/cordial,0,3,0,0
 107,mund,LATIN,world or clean,from mundus — mundo/monde/mondo/mundane,0,0,0,0
-108,soci,LATIN,companion or society,from socius — sociedade/sociedad/société/society,0,0,0,0
+108,soci,LATIN,companion or society,from socius — sociedade/sociedad/société/society,0,3,0,0
 109,natur,LATIN,nature or birth,from natura/natus — natureza/nature/natura/Natur,0,0,0,0
 110,y,TUPI,water,Tupi y=water; root of Iguaçu(great water)/Igarapé/Ipiranga,0,0,0,0
 111,tup,TUPI,divine or thunder,Tupi Tupã=thunder god; sacred root of Tupinambá people,0,0,0,0
@@ -119,14 +119,248 @@ root_id,root_str,origin,meaning_en,notes,parent_root_id,hypernym_root_id,antonym
 118,sukh,SANSKRIT,happiness or ease,Sanskrit sukha — antonym of dukkha; Buddhist/Hindu core concept,0,0,119,35
 119,duhkh,SANSKRIT,suffering or pain,Sanskrit dukkha — fundamental Buddhist concept of suffering,118,0,118,38
 120,shant,SANSKRIT,peace or tranquility,Sanskrit shanti — shanti(peace) across Hindi/Bengali/Marathi,0,0,0,12
-121,dharm,SANSKRIT,moral order or duty,Sanskrit dharma — moral law across Hindu/Buddhist/Jain traditions,0,0,0,0
+121,dharm,SANSKRIT,moral order or duty,Sanskrit dharma — moral law across Hindu/Buddhist/Jain traditions,0,3,0,0
 122,poss,LATIN,possibility or potentiality,from posse (to be able) — can/poder/pouvoir/können/potere; deontic modal,0,0,123,0
 123,neces,LATIN,necessity or obligation,from necesse (unavoidable) — must/dever/devoir/müssen/dovere; deontic modal,0,0,122,0
-124,praeter,LATIN,past or before,from praeteritus (gone by) — past tense marker across languages,0,0,126,0
-125,praesens,LATIN,present or now,from praesens (being present) — present tense marker,0,0,0,0
-126,futur,LATIN,future or forthcoming,from futurus (about to be) — future tense marker across languages,0,0,124,0
+124,praeter,LATIN,past or before,from praeteritus (gone by) — past tense marker across languages,0,0,126,68
+125,praesens,LATIN,present or now,from praesens (being present) — present tense marker,0,0,0,68
+126,futur,LATIN,future or forthcoming,from futurus (about to be) — future tense marker across languages,0,0,124,68
 127,omn,LATIN,all or every (universal quantifier),from omnis (all) — todo/all/tout/alle/tutto; universal quantification,0,0,128,0
 128,null_q,LATIN,none or zero (negative quantifier),from nullus (none) — nenhum/none/aucun/kein/nessuno; negative quantification,0,0,127,0
-129,aliq,LATIN,some or any (existential quantifier),from aliquis (someone) — algum/some/quelque/einige/qualche; existential quantification,127,0,0,0
+129,aliq,LATIN,some or any (existential quantifier),from aliquis (someone) — algum/some/quelque/einige/qualche; existential quantification,127,127,0,0
 130,proxim,LATIN,proximate or near,from proximus (nearest) — aqui/here/ici/hier/qui; spatial proximity deictic,0,0,131,0
 131,distal,LATIN,distal or far,from distare (to be apart) — lá/there/là/dort/là; spatial distance deictic,0,0,130,0
+132,negativ,UNKNOWN,negative,auto-discovered via Wiktionary,0,,,
+133,bom,UNKNOWN,good,auto-discovered via Wiktionary,0,,,
+134,buono,UNKNOWN,"good, nice (in general)",auto-discovered via Wiktionary,0,,,
+135,bonito,UNKNOWN,"Any of various marine fish of the genus  that are related to and resemble the tuna, but smaller.",auto-discovered via Wiktionary,0,,,
+136,mau,UNKNOWN,bad,auto-discovered via Wiktionary,0,,,
+137,malevolo,UNKNOWN,malevolent,auto-discovered via Wiktionary,0,,,
+138,libre,UNKNOWN,"Especially of the will: free, independent, unconstrained.",auto-discovered via Wiktionary,0,,,
+139,amor,LATIN,"love, affection",auto-discovered via Wiktionary,0,,,
+140,amour,UNKNOWN,Courtship; flirtation.,auto-discovered via Wiktionary,0,,,
+141,amado,UNKNOWN,beloved,auto-discovered via Wiktionary,0,,,
+142,amavel,UNKNOWN,"amiable, lovable, lovely",auto-discovered via Wiktionary,0,,,
+143,traurig,UNKNOWN,sad,auto-discovered via Wiktionary,0,,,
+144,tristesse,UNKNOWN,sadness,auto-discovered via Wiktionary,0,,,
+145,gʷerh,PROTO_INDO_EUROPEAN,"appreciated, welcome",auto-discovered via Wiktionary,0,,,
+146,gratidao,UNKNOWN,"gratitude, gratefulness",auto-discovered via Wiktionary,0,,,
+147,terrivel,UNKNOWN,terrible,auto-discovered via Wiktionary,0,,,
+148,terribile,UNKNOWN,"terrible, terrifying, fearful",auto-discovered via Wiktionary,0,,,
+149,violencia,UNKNOWN,violence,auto-discovered via Wiktionary,0,,,
+150,incrivel,UNKNOWN,"noncredible, uncredible",auto-discovered via Wiktionary,0,,,
+151,excelente,UNKNOWN,excellent,auto-discovered via Wiktionary,0,,,
+152,excellēns,LATIN,"excellent, superb, first-class",auto-discovered via Wiktionary,0,,,
+153,exzellent,UNKNOWN,excellent,auto-discovered via Wiktionary,0,,,
+154,excelencia,UNKNOWN,excellence (the quality of being excellent),auto-discovered via Wiktionary,0,,,
+155,belo,UNKNOWN,beautiful,auto-discovered via Wiktionary,0,,,
+156,beleza,UNKNOWN,beauty  or good-looking}},auto-discovered via Wiktionary,0,,,
+157,felice,UNKNOWN,happy; fortunate,auto-discovered via Wiktionary,0,,,
+158,dolore,UNKNOWN,"ache, pain",auto-discovered via Wiktionary,0,,,
+159,met,LATIN,fear,auto-discovered via Wiktionary,0,,,
+160,paura,UNKNOWN,fear,auto-discovered via Wiktionary,0,,,
+161,angst,UNKNOWN,To suffer angst; to fret.,auto-discovered via Wiktionary,0,,,
+162,novo,UNKNOWN,new,auto-discovered via Wiktionary,0,,,
+163,magnifique,UNKNOWN,"magnificent, splendid, superb",auto-discovered via Wiktionary,0,,,
+164,lief,UNKNOWN,"Beloved, dear, agreeable.",auto-discovered via Wiktionary,0,,,
+165,embora,UNKNOWN,luckily; happily; in good time; at the moment,auto-discovered via Wiktionary,0,,,
+166,bene,LATIN,"good, all right, great",auto-discovered via Wiktionary,0,,,
+167,geweldig,UNKNOWN,"tremendous, enormous",auto-discovered via Wiktionary,0,,,
+168,pessimo,UNKNOWN,"very bad, awful, foul, dreadful",auto-discovered via Wiktionary,0,,,
+169,krachtig,UNKNOWN,"powerful, strong",auto-discovered via Wiktionary,0,,,
+170,kraftig,UNKNOWN,"bold, intense, powerful, robust, strong, sturdy, vigorous, vivid",auto-discovered via Wiktionary,0,,,
+171,aitante,UNKNOWN,"strong, sturdy",auto-discovered via Wiktionary,0,,,
+172,solido,UNKNOWN,solid (not fluid),auto-discovered via Wiktionary,0,,,
+173,standvastig,UNKNOWN,"strong, steadfast, steady",auto-discovered via Wiktionary,0,,,
+174,intenso,UNKNOWN,"intense, strong",auto-discovered via Wiktionary,0,,,
+175,captīv,LATIN,bad,auto-discovered via Wiktionary,0,,,
+176,valido,UNKNOWN,"valid, effective, good, substantial, sound, strong",auto-discovered via Wiktionary,0,,,
+177,kraft,UNKNOWN,"A kind of strong, smooth brown wrapping paper.",auto-discovered via Wiktionary,0,,,
+178,affāb,LATIN,"Receiving others kindly and conversing with them in a free and friendly manner; friendly, courteous, sociable.",auto-discovered via Wiktionary,0,,,
+179,amabile,UNKNOWN,"amiable, pleasant",auto-discovered via Wiktionary,0,,,
+180,afable,UNKNOWN,affable,auto-discovered via Wiktionary,0,,,
+181,vergon,UNKNOWN,having a big penis,auto-discovered via Wiktionary,0,,,
+182,verdriet,UNKNOWN,"grief, sadness, sorrow",auto-discovered via Wiktionary,0,,,
+183,droefenis,UNKNOWN,sadness,auto-discovered via Wiktionary,0,,,
+184,tristezza,UNKNOWN,"sadness, unhappiness",auto-discovered via Wiktionary,0,,,
+185,engurrio,UNKNOWN,"sadness, melancholy",auto-discovered via Wiktionary,0,,,
+186,malheur,UNKNOWN,"mishap, misfortune",auto-discovered via Wiktionary,0,,,
+187,dankbaar,UNKNOWN,"thankful, grateful",auto-discovered via Wiktionary,0,,,
+188,reconnaissant,UNKNOWN,"grateful, thankful",auto-discovered via Wiktionary,0,,,
+189,erkenntlich,UNKNOWN,grateful,auto-discovered via Wiktionary,0,,,
+190,agradecido,UNKNOWN,"thankful, grateful",auto-discovered via Wiktionary,0,,,
+191,terreur,UNKNOWN,"terror, instance or cause of fear",auto-discovered via Wiktionary,0,,,
+192,effroi,UNKNOWN,"terror, dread",auto-discovered via Wiktionary,0,,,
+193,afschuwelijk,UNKNOWN,"heinous, horrible",auto-discovered via Wiktionary,0,,,
+194,verschrikkelijk,UNKNOWN,"awful, terrible",auto-discovered via Wiktionary,0,,,
+195,horrible,UNKNOWN,Causing horror; terrible; shocking.,auto-discovered via Wiktionary,0,,,
+196,epouvantable,UNKNOWN,"atrocious, awful, appalling",auto-discovered via Wiktionary,0,,,
+197,schrecklich,UNKNOWN,"awful, terrible, horrible",auto-discovered via Wiktionary,0,,,
+198,formidavel,UNKNOWN,fantastic; great; amazing,auto-discovered via Wiktionary,0,,,
+199,furchtbar,UNKNOWN,terrible,auto-discovered via Wiktionary,0,,,
+200,horrivel,UNKNOWN,cause of horror; horrible; terrible,auto-discovered via Wiktionary,0,,,
+201,miserabel,UNKNOWN,miserable,auto-discovered via Wiktionary,0,,,
+202,hostilidade,UNKNOWN,hostility (state of being hostile),auto-discovered via Wiktionary,0,,,
+203,gewaltbereit,UNKNOWN,prone to violence; violent,auto-discovered via Wiktionary,0,,,
+204,apaciguar,UNKNOWN,"to pacify, to appease, to defuse, to placate, to mollify, to ease, to allay, to assuage",auto-discovered via Wiktionary,0,,,
+205,rechtvaardigheid,UNKNOWN,justice (state or instance of being just or fair),auto-discovered via Wiktionary,0,,,
+206,giustizia,UNKNOWN,"justice, fairness, equity",auto-discovered via Wiktionary,0,,,
+207,ga,PROTO_GERMANIC,"just, fair, deserved",auto-discovered via Wiktionary,0,,,
+208,erstaunlich,UNKNOWN,"amazing, impressive, surprising",auto-discovered via Wiktionary,0,,,
+209,verwunderlich,UNKNOWN,amazingˌ astonishingˌ remarkableˌ strangeˌ surprisingˌ wondrous,auto-discovered via Wiktionary,0,,,
+210,herrlich,UNKNOWN,fantastic; marvelous; wonderful; splendid; glorious; lovely,auto-discovered via Wiktionary,0,,,
+211,wunderbar,UNKNOWN,wonderful,auto-discovered via Wiktionary,0,,,
+212,maravilloso,UNKNOWN,"wonderful, marvelous",auto-discovered via Wiktionary,0,,,
+213,uitstekend,UNKNOWN,"outstanding, excellent",auto-discovered via Wiktionary,0,,,
+214,uitmuntend,UNKNOWN,"excellent, of the highest quality",auto-discovered via Wiktionary,0,,,
+215,voortreffelijk,UNKNOWN,"excellent, outstanding, exquisite",auto-discovered via Wiktionary,0,,,
+216,ausgezeichnet,UNKNOWN,"excellent, outstanding",auto-discovered via Wiktionary,0,,,
+217,hervorragend,UNKNOWN,"outstanding, superb",auto-discovered via Wiktionary,0,,,
+218,grossartig,UNKNOWN,"terrific, superb, etc.",auto-discovered via Wiktionary,0,,,
+219,sobresaliente,UNKNOWN,outstanding,auto-discovered via Wiktionary,0,,,
+220,macanudo,UNKNOWN,"groovy, easy going, smooth",auto-discovered via Wiktionary,0,,,
+221,voortreffelijkheid,UNKNOWN,"excellence, exquisiteness",auto-discovered via Wiktionary,0,,,
+222,mooi,UNKNOWN,"beautiful, pretty",auto-discovered via Wiktionary,0,,,
+223,schoon,UNKNOWN,beautiful,auto-discovered via Wiktionary,0,,,
+224,schon,UNKNOWN,beautiful; pretty; nice,auto-discovered via Wiktionary,0,,,
+225,incantevole,UNKNOWN,"enchanting, charming, beautiful, delightful",auto-discovered via Wiktionary,0,,,
+226,meraviglioso,UNKNOWN,"marvellous, wonderful, splendid, glorious",auto-discovered via Wiktionary,0,,,
+227,lindo,UNKNOWN,beautiful,auto-discovered via Wiktionary,0,,,
+228,hermoso,UNKNOWN,"gorgeous, beautiful, handsome, lovely",auto-discovered via Wiktionary,0,,,
+229,fōrmōs,LATIN,beautiful,auto-discovered via Wiktionary,0,,,
+230,alegre,UNKNOWN,happy,auto-discovered via Wiktionary,0,,,
+231,stupĕnd,LATIN,"wonderful, marvellous, stunning, fabulous, stupendous",auto-discovered via Wiktionary,0,,,
+232,splendid,LATIN,"splendid, brilliant, glorious, magnificent",auto-discovered via Wiktionary,0,,,
+233,schoonheid,UNKNOWN,beauty,auto-discovered via Wiktionary,0,,,
+234,bellezza,UNKNOWN,beauty,auto-discovered via Wiktionary,0,,,
+235,pretiōsitās,LATIN,preciousness,auto-discovered via Wiktionary,0,,,
+236,gelukkig,UNKNOWN,happy,auto-discovered via Wiktionary,0,,,
+237,blij,UNKNOWN,happy;,auto-discovered via Wiktionary,0,,,
+238,heureux,UNKNOWN,happy,auto-discovered via Wiktionary,0,,,
+239,bienheureux,UNKNOWN,"blessed, blest (of a person)",auto-discovered via Wiktionary,0,,,
+240,zufrieden,UNKNOWN,"satisfied, content, happy (with something)",auto-discovered via Wiktionary,0,,,
+241,froh,UNKNOWN,glad; (momentarily) happy; (momentarily) cheerful,auto-discovered via Wiktionary,0,,,
+242,freudig,UNKNOWN,"joyful, cheerful",auto-discovered via Wiktionary,0,,,
+243,chanceux,UNKNOWN,with good luck; fortunate,auto-discovered via Wiktionary,0,,,
+244,glucklich,UNKNOWN,happy;,auto-discovered via Wiktionary,0,,,
+245,joyeux,UNKNOWN,"joyful, happy",auto-discovered via Wiktionary,0,,,
+246,geluk,UNKNOWN,"luck, good luck",auto-discovered via Wiktionary,0,,,
+247,bonheur,UNKNOWN,"goodhap, good fortune",auto-discovered via Wiktionary,0,,,
+248,colere,UNKNOWN,"anger, rage",auto-discovered via Wiktionary,0,,,
+249,turnaz,PROTO_GERMANIC,anger,auto-discovered via Wiktionary,0,,,
+250,kwaad,UNKNOWN,angry,auto-discovered via Wiktionary,0,,,
+251,fache,UNKNOWN,angry,auto-discovered via Wiktionary,0,,,
+252,bose,UNKNOWN,evil; malicious; wicked,auto-discovered via Wiktionary,0,,,
+253,verargert,UNKNOWN,"upset, annoyed, angry",auto-discovered via Wiktionary,0,,,
+254,zornig,UNKNOWN,angry; wrathful; irate,auto-discovered via Wiktionary,0,,,
+255,arrabbiato,UNKNOWN,"mad, rabid",auto-discovered via Wiktionary,0,,,
+256,rabiōs,LATIN,"angry, enraged",auto-discovered via Wiktionary,0,,,
+257,irritado,UNKNOWN,feeling anger; angry; irritated; furious,auto-discovered via Wiktionary,0,,,
+258,zangado,UNKNOWN,angry,auto-discovered via Wiktionary,0,,,
+259,enojado,UNKNOWN,"angry, mad",auto-discovered via Wiktionary,0,,,
+260,woedend,UNKNOWN,"furious, very angry",auto-discovered via Wiktionary,0,,,
+261,ziedend,UNKNOWN,"furious, very angry, seething",auto-discovered via Wiktionary,0,,,
+262,wutend,UNKNOWN,furious,auto-discovered via Wiktionary,0,,,
+263,airado,UNKNOWN,"angry, irate",auto-discovered via Wiktionary,0,,,
+264,mistroostig,UNKNOWN,"despondent, miserable",auto-discovered via Wiktionary,0,,,
+265,mismoedig,UNKNOWN,"downcast, despondent",auto-discovered via Wiktionary,0,,,
+266,droefgeestig,UNKNOWN,"dolorous, sad, sombre",auto-discovered via Wiktionary,0,,,
+267,craintif,UNKNOWN,"worried, anxious, nervous",auto-discovered via Wiktionary,0,,,
+268,furchtsam,UNKNOWN,fearful; timid; frightened,auto-discovered via Wiktionary,0,,,
+269,angstlich,UNKNOWN,"fearful, anxious",auto-discovered via Wiktionary,0,,,
+270,pavid,LATIN,"fearful, timid, pavid",auto-discovered via Wiktionary,0,,,
+271,mortel,UNKNOWN,mortal,auto-discovered via Wiktionary,0,,,
+272,louable,UNKNOWN,laudable; worthy of praise,auto-discovered via Wiktionary,0,,,
+273,grand,UNKNOWN,"Large, senior , intense, extreme, or exceptional",auto-discovered via Wiktionary,0,,,
+274,heerlijk,UNKNOWN,"wonderful (when referring to a sensation), great",auto-discovered via Wiktionary,0,,,
+275,super,UNKNOWN,"Of excellent quality, superfine.",auto-discovered via Wiktionary,0,,,
+276,formible,OLD_FRENCH,"Causing fear, dread, awe, or discouragement as a result of size, strength, or some other impressive feature; commanding respect; causing wonder or astonishment.",auto-discovered via Wiktionary,0,,,
+277,wundervoll,UNKNOWN,wonderful,auto-discovered via Wiktionary,0,,,
+278,superbo,UNKNOWN,"superb, excellent",auto-discovered via Wiktionary,0,,,
+279,genial,UNKNOWN,Friendly and cheerful; enlivening.,auto-discovered via Wiktionary,0,,,
+280,feten,UNKNOWN,"brilliant, awesome",auto-discovered via Wiktionary,0,,,
+281,piola,UNKNOWN,"agreeable, supporting, pleasant",auto-discovered via Wiktionary,0,,,
+282,requetebien,UNKNOWN,"very well, wonderfully, masterfully",auto-discovered via Wiktionary,0,,,
+283,buenisimo,UNKNOWN,: very good,auto-discovered via Wiktionary,0,,,
+284,crass,LATIN,"stark, extreme",auto-discovered via Wiktionary,0,,,
+285,absolūt,LATIN,"absolute, complete, perfect",auto-discovered via Wiktionary,0,,,
+286,incredibilmente,UNKNOWN,"incredibly, unbelievably, fantastically, amazingly",auto-discovered via Wiktionary,0,,,
+287,incrivelmente,UNKNOWN,incredibly,auto-discovered via Wiktionary,0,,,
+288,dubitare,UNKNOWN,to doubt,auto-discovered via Wiktionary,0,,,
+289,bruut,UNKNOWN,"brutish, rough",auto-discovered via Wiktionary,0,,,
+290,sucette,UNKNOWN,lollipop,auto-discovered via Wiktionary,0,,,
+291,succhiotto,UNKNOWN,"love bite, hickey",auto-discovered via Wiktionary,0,,,
+292,cagar,UNKNOWN,to shit,auto-discovered via Wiktionary,0,,,
+293,patetico,GREEK,"pathetic (arousing pity, sympathy, or compassion)",auto-discovered via Wiktionary,0,,,
+294,crūdēl,LATIN,cruel,auto-discovered via Wiktionary,0,,,
+295,crueldade,UNKNOWN,cruelty,auto-discovered via Wiktionary,0,,,
+296,cruaute,UNKNOWN,cruelty,auto-discovered via Wiktionary,0,,,
+297,dolcezza,UNKNOWN,sweetness,auto-discovered via Wiktionary,0,,,
+298,docura,UNKNOWN,sweetness,auto-discovered via Wiktionary,0,,,
+299,sao,UNKNOWN,"sound, healthy",auto-discovered via Wiktionary,0,,,
+300,misero,UNKNOWN,"unfortunate, poor, wretched, pitiful",auto-discovered via Wiktionary,0,,,
+301,miseria,UNKNOWN,poverty,auto-discovered via Wiktionary,0,,,
+302,pai,UNKNOWN,good,auto-discovered via Wiktionary,0,,,
+303,cuer,OLD_FRENCH,heart,auto-discovered via Wiktionary,0,,,
+304,salim,UNKNOWN,healthy,auto-discovered via Wiktionary,0,,,
+305,aqui,UNKNOWN,to be (negative).,auto-discovered via Wiktionary,0,,,
+306,vol,LATIN,malevolent,auto-discovered via Wiktionary,0,,,
+307,malignidade,UNKNOWN,"malice, malignity, perversity, wickedness",auto-discovered via Wiktionary,0,,,
+308,maldade,UNKNOWN,malice,auto-discovered via Wiktionary,0,,,
+309,extra,UNKNOWN,"Beyond what is due, usual, expected, or necessary; extraneous; additional; supernumerary.",auto-discovered via Wiktionary,0,,,
+310,malveillant,UNKNOWN,"malicious, malevolent",auto-discovered via Wiktionary,0,,,
+311,malefique,UNKNOWN,"maleficent, malevolent",auto-discovered via Wiktionary,0,,,
+312,malva,OLD_FRENCH,bad,auto-discovered via Wiktionary,0,,,
+313,boswillig,UNKNOWN,malevolent,auto-discovered via Wiktionary,0,,,
+314,bosartig,UNKNOWN,malicious; vicious; malevolent,auto-discovered via Wiktionary,0,,,
+315,maligno,UNKNOWN,"spiteful, malicious",auto-discovered via Wiktionary,0,,,
+316,mechancete,UNKNOWN,"nastiness, malice, wickedness",auto-discovered via Wiktionary,0,,,
+317,cattiveria,UNKNOWN,"wickedness, nastiness, spite",auto-discovered via Wiktionary,0,,,
+318,brillant,UNKNOWN,"bright, shiny",auto-discovered via Wiktionary,0,,,
+319,conversazione,UNKNOWN,A formal gathering where something related to the arts or academia is discussed.,auto-discovered via Wiktionary,0,,,
+320,dulcur,OLD_FRENCH,"Sweetness of manner: agreeableness, gentleness.",auto-discovered via Wiktionary,0,,,
+321,sucrosite,UNKNOWN,"sweetness, sugariness",auto-discovered via Wiktionary,0,,,
+322,dulzor,UNKNOWN,sweetness,auto-discovered via Wiktionary,0,,,
+323,melosidad,UNKNOWN,sweetness,auto-discovered via Wiktionary,0,,,
+324,elend,UNKNOWN,miserable,auto-discovered via Wiktionary,0,,,
+325,erbarmlich,UNKNOWN,"pitiful, miserable, pathetic, wretched",auto-discovered via Wiktionary,0,,,
+326,jammerlich,UNKNOWN,"pitiable, miserable",auto-discovered via Wiktionary,0,,,
+327,desdicha,UNKNOWN,bad luck,auto-discovered via Wiktionary,0,,,
+328,gemeinschaft,UNKNOWN,"An association or group of individuals sharing common beliefs, attitudes, and tastes; a fellowship.",auto-discovered via Wiktionary,0,,,
+329,herzlich,UNKNOWN,"warm, warmhearted, friendly, affectionate, cordial",auto-discovered via Wiktionary,0,,,
+330,pro,LATIN,"Unclean; ritually impure; unholy, desecrating a holy place or thing.",auto-discovered via Wiktionary,0,,,
+331,māter,LATIN,"Of, relating to, or consisting of matter, especially physical.",auto-discovered via Wiktionary,0,,,
+332,souffrance,UNKNOWN,"sufferance, pain, suffering",auto-discovered via Wiktionary,0,,,
+333,douleur,UNKNOWN,pain,auto-discovered via Wiktionary,0,,,
+334,sufriente,UNKNOWN,suffering,auto-discovered via Wiktionary,0,,,
+335,sale,UNKNOWN,An exchange of goods or services for currency or credit.,auto-discovered via Wiktionary,0,,,
+336,obscēn,LATIN,"obscene, indecent, smutty",auto-discovered via Wiktionary,0,,,
+337,gemein,UNKNOWN,"mean, nasty, wicked",auto-discovered via Wiktionary,0,,,
+338,negatief,UNKNOWN,negative,auto-discovered via Wiktionary,0,,,
+339,kwaadwillend,UNKNOWN,"malevolent, evil",auto-discovered via Wiktionary,0,,,
+340,zoetheid,UNKNOWN,sweetness,auto-discovered via Wiktionary,0,,,
+341,단맛,UNKNOWN,"sweetness, sweet taste",auto-discovered via Wiktionary,0,,,
+342,見,JAPANESE,"miserable, pitiful",auto-discovered via Wiktionary,0,,,
+343,悲惨,UNKNOWN,"miserable, tragic, woeful, sorrowful",auto-discovered via Wiktionary,0,,,
+344,下手,UNKNOWN,"unskilled, bad at, poor at, weak at, incompetent",auto-discovered via Wiktionary,0,,,
+345,苦痛,UNKNOWN,agony; pain; suffering,auto-discovered via Wiktionary,0,,,
+346,tene,LATIN,"to maintain, to keep",auto-discovered via Wiktionary,0,,,
+347,piazzaforte,UNKNOWN,fortified town,auto-discovered via Wiktionary,0,,,
+348,要塞,UNKNOWN,stronghold; fort; fortification; fortress; strategic spot,auto-discovered via Wiktionary,0,,,
+349,また,UNKNOWN,"again, as well",auto-discovered via Wiktionary,0,,,
+350,美人,UNKNOWN,"a beautiful woman, a beauty, a belle",auto-discovered via Wiktionary,0,,,
+351,sort=ひじょ',MIDDLE_CHINESE,"a beautiful girl or woman, a beauty",auto-discovered via Wiktionary,0,,,
+352,別嬪,UNKNOWN,beautiful woman,auto-discovered via Wiktionary,0,,,
+353,sort=あっぱれ,OLD_JAPANESE,"admirable, commendable, wonderful, brilliant, splendid, worthy",auto-discovered via Wiktionary,0,,,
+354,veta,UNKNOWN,"A second-order measure of derivative price sensitivity, expressed as the rate of change of vega with respect to time, or equivalently the rate of change of theta with respect to changes in the volatility of the underlying asset.",auto-discovered via Wiktionary,0,,,
+355,悲愴,UNKNOWN,"pathetic, sad, sorrowful",auto-discovered via Wiktionary,0,,,
+356,mechanisch,UNKNOWN,"mechanical, related to mechanics and/or machinery",auto-discovered via Wiktionary,0,,,
+357,geliefd,UNKNOWN,"beloved, object of love",auto-discovered via Wiktionary,0,,,
+358,grave,UNKNOWN,Characterised by a dignified sense of seriousness; not cheerful.,auto-discovered via Wiktionary,0,,,
+359,angustia,UNKNOWN,"anguish, torment",auto-discovered via Wiktionary,0,,,
+360,aflicao,UNKNOWN,"affliction (a state of pain, suffering, distress or agony)",auto-discovered via Wiktionary,0,,,
+361,freundlich,UNKNOWN,"friendly, benign",auto-discovered via Wiktionary,0,,,
+362,bonario,UNKNOWN,"good-natured, kindly, affable",auto-discovered via Wiktionary,0,,,
+363,sort=そうだい,MIDDLE_CHINESE,"magnificent, grand; imposing",auto-discovered via Wiktionary,0,,,
+364,壮観,UNKNOWN,being a magnificent sight,auto-discovered via Wiktionary,0,,,
+365,hate,UNKNOWN,To dislike intensely or greatly.,auto-discovered via Wiktionary,0,,,
