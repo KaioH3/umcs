@@ -141,6 +141,29 @@ func RegisterFromSentiment(sent uint32) uint32 {
 	return 0
 }
 
+// roleRules maps suffixes to semantic roles.
+// These rules are weaker than POS rules but provide useful signal
+// when no explicit annotation exists.
+var roleRules = []suffixRule{
+	// Emotion-bearing suffixes → EMOTION role
+	{"-ful", "EN", sentiment.RoleEmotion},
+	{"-less", "EN", sentiment.RoleEmotion},
+	{"-oso", "PT", sentiment.RoleEmotion}, {"-osa", "PT", sentiment.RoleEmotion},
+	{"-oso", "ES", sentiment.RoleEmotion}, {"-osa", "ES", sentiment.RoleEmotion},
+	{"-oso", "IT", sentiment.RoleEmotion},
+	{"-eux", "FR", sentiment.RoleEmotion}, {"-euse", "FR", sentiment.RoleEmotion},
+	// Cognitive suffixes → COGNITION role
+	{"-mente", "PT", sentiment.RoleCognition}, {"-mente", "ES", sentiment.RoleCognition},
+	{"-mente", "IT", sentiment.RoleCognition}, {"-ment", "FR", sentiment.RoleCognition},
+	{"-ly", "EN", sentiment.RoleCognition},
+	// Causal suffixes → CAUSATION role
+	{"-izar", "PT", sentiment.RoleCausation}, {"-izar", "ES", sentiment.RoleCausation},
+	{"-ize", "EN", sentiment.RoleCausation}, {"-ise", "EN", sentiment.RoleCausation},
+	{"-ieren", "DE", sentiment.RoleCausation},
+	// Temporal suffixes → TEMPORAL role
+	{"-ência", "PT", sentiment.RoleTemporal}, {"-encia", "ES", sentiment.RoleTemporal},
+}
+
 // FillMissing applies morphological inference to fill in zero (unset) sentiment
 // dimensions. It does NOT overwrite non-zero values. Returns the augmented value.
 func FillMissing(sent uint32, word, lang string) uint32 {
@@ -150,10 +173,57 @@ func FillMissing(sent uint32, word, lang string) uint32 {
 			sent |= pos
 		}
 	}
-	// Infer concreteness if unset (bit 28 = 0 could mean abstract OR unset)
-	// We infer ABSTRACT from suffix; concreteness defaults to 0 anyway.
-	// Only set CONCRETE explicitly for known concrete patterns.
-	// (Most words are abstract-unset; inference here would have too many false positives)
+
+	// Infer concreteness from suffix (abstract suffixes → bit 28 stays 0).
+	// Explicit CONCRETE only for non-suffix words with concrete POS (NOUN without abstract suffix).
+	if IsAbstractFromShape(word, lang) {
+		// Already abstract (bit 28 = 0), no change needed.
+	}
+
+	// Infer semantic role if unset
+	if sentiment.Role(sent) == 0 {
+		sent = inferRole(sent, word, lang)
+	}
+
+	return sent
+}
+
+// inferRole assigns a semantic role based on polarity, POS, and suffix patterns.
+func inferRole(sent uint32, word, lang string) uint32 {
+	pol := sentiment.Polarity(sent)
+	pos := sentiment.POS(sent)
+
+	// Words with explicit polarity + ADJ/ADV → likely EVALUATION
+	if pol != sentiment.PolarityNeutral && pol != 0 {
+		if pos == sentiment.POSAdj || pos == sentiment.POSAdv {
+			return sent | sentiment.RoleEvaluation
+		}
+		// NOUN/VERB with polarity → EMOTION (feelings, emotional actions)
+		if pos == sentiment.POSNoun || pos == sentiment.POSVerb {
+			return sent | sentiment.RoleEmotion
+		}
+	}
+
+	// Suffix-based role inference
+	lower := strings.ToLower(word)
+	var best uint32
+	var bestLen int
+	for _, r := range roleRules {
+		if r.lang != "" && r.lang != lang {
+			continue
+		}
+		suf := r.suffix
+		if strings.HasPrefix(suf, "-") {
+			suf = suf[1:]
+		}
+		if strings.HasSuffix(lower, suf) && len(suf) > bestLen {
+			best = r.bit
+			bestLen = len(suf)
+		}
+	}
+	if best != 0 {
+		return sent | best
+	}
 
 	return sent
 }
