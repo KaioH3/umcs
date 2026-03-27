@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kak/umcs/pkg/morpheme"
@@ -21,6 +22,8 @@ type Config struct {
 	Limit     int      // max new words to add in this run
 	DryRun    bool     // if true, print results but do not modify CSVs
 	Reset     bool     // if true, delete checkpoint before running (fresh exploration)
+	Reexpand  bool     // if true, re-process seeds even if already in checkpoint
+	Workers   int      // parallel Wiktionary fetchers (default 1; capped by rate limit)
 	OutDir    string   // directory containing roots.csv, words.csv, checkpoints
 	RootsPath string   // full path to roots.csv
 	WordsPath string   // full path to words.csv
@@ -60,6 +63,41 @@ type bfsItem struct {
 	depth int
 }
 
+// fetchResult pairs a BFS item with its Wiktionary fetch result.
+type fetchResult struct {
+	item  bfsItem
+	entry *Entry
+	err   error
+}
+
+// parallelFetch fetches up to len(items) Wiktionary pages concurrently using
+// workers goroutines. Results preserve item order.
+func parallelFetch(items []bfsItem, workers int) []fetchResult {
+	if workers <= 1 {
+		results := make([]fetchResult, len(items))
+		for i, item := range items {
+			e, err := Fetch(item.word, item.lang)
+			results[i] = fetchResult{item: item, entry: e, err: err}
+		}
+		return results
+	}
+	results := make([]fetchResult, len(items))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, workers)
+	for i, item := range items {
+		wg.Add(1)
+		go func(i int, item bfsItem) {
+			defer wg.Done()
+			sem <- struct{}{}
+			e, err := Fetch(item.word, item.lang)
+			results[i] = fetchResult{item: item, entry: e, err: err}
+			<-sem
+		}(i, item)
+	}
+	wg.Wait()
+	return results
+}
+
 // Run executes the automated discovery pipeline.
 //
 // Phase 1 — BFS: fetch Wiktionary entries for each seed, extract translations.
@@ -72,6 +110,11 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 	}
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(out, format+"\n", args...)
+	}
+
+	workers := cfg.Workers
+	if workers <= 0 {
+		workers = 1
 	}
 
 	start := time.Now()
@@ -157,20 +200,39 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 		len(cfg.Seeds), strings.Join(cfg.Langs, ","), cfg.MaxDepth, cfg.Limit)
 
 	for len(queue) > 0 && stats.WordsAdded < cfg.Limit {
-		item := queue[0]
-		queue = queue[1:]
+		// Pull a batch of up to `workers` items that haven't been processed yet.
+		batchSize := workers
+		if batchSize < 1 {
+			batchSize = 1
+		}
+		var batch []bfsItem
+		newQueue := queue[:0]
+		for _, item := range queue {
+			fetchKey := item.word + "_" + item.lang
+			if cp.IsProcessed(fetchKey) && !(cfg.Reexpand && item.depth == 0) {
+				stats.WordsSkipped++
+				continue
+			}
+			if len(batch) < batchSize {
+				batch = append(batch, item)
+			} else {
+				newQueue = append(newQueue, item)
+			}
+		}
+		queue = newQueue
 
-		fetchKey := item.word + "_" + item.lang
-
-		if cp.IsProcessed(fetchKey) {
-			stats.WordsSkipped++
-			continue
+		if len(batch) == 0 {
+			break
 		}
 
-		stats.WordsExplored++
+		// Fetch all batch items (in parallel when workers > 1).
+		fetched := parallelFetch(batch, workers)
 
-		// Fetch Wiktionary.
-		entry, err := Fetch(item.word, item.lang)
+		for _, fr := range fetched {
+			item := fr.item
+			fetchKey := item.word + "_" + item.lang
+			entry := fr.entry
+			err := fr.err
 		if err != nil {
 			if cfg.Verbose {
 				logf("  skip %q [%s]: %v", item.word, item.lang, err)
@@ -312,6 +374,7 @@ func Run(cfg Config, existingRoots []seed.Root, existingWords []seed.Word) (*Sta
 		if len(pendingWords) >= 50 {
 			flush()
 		}
+		} // end for _, fr := range fetched
 	}
 
 	flush() // final flush
