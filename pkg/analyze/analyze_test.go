@@ -206,3 +206,150 @@ func TestTokenCount(t *testing.T) {
 		t.Fatalf("want 2 matched (not, terrible), got %d", r.Matched)
 	}
 }
+
+// ── EmotionDecompose tests ───────────────────────────────────────────────────
+
+func TestEmotionDecompose_NegativeText(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "terrible negative")
+	ep := analyze.EmotionDecompose(r, lex)
+
+	// Should have non-zero negative emotions
+	if ep.Dominant == "JOY" || ep.Dominant == "TRUST" || ep.Dominant == "SERENITY" {
+		t.Errorf("negative text should not have positive dominant emotion, got %s", ep.Dominant)
+	}
+}
+
+func TestEmotionDecompose_PositiveText(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "good")
+	ep := analyze.EmotionDecompose(r, lex)
+
+	// Dominant should be a positive emotion or neutral
+	negativeEmotions := map[string]bool{"ANGER": true, "FEAR": true, "DISGUST": true}
+	if negativeEmotions[ep.Dominant] {
+		t.Errorf("positive text should not have %s as dominant", ep.Dominant)
+	}
+}
+
+func TestEmotionDecompose_EmptyText(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "unknown words")
+	ep := analyze.EmotionDecompose(r, lex)
+
+	if ep.Dominant != "NEUTRAL" {
+		t.Errorf("empty decompose should be NEUTRAL, got %s", ep.Dominant)
+	}
+}
+
+func TestEmotionDecompose_AllValuesNormalized(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "very terrible negative")
+	ep := analyze.EmotionDecompose(r, lex)
+
+	vals := []float64{ep.Joy, ep.Trust, ep.Fear, ep.Anger, ep.Sadness,
+		ep.Surprise, ep.Disgust, ep.Serenity}
+	for i, v := range vals {
+		if v < 0 || v > 1 {
+			t.Errorf("emotion[%d]=%f out of [0,1] range", i, v)
+		}
+	}
+}
+
+// ── DetectDrift tests ────────────────────────────────────────────────────────
+
+func TestDetectDrift_EmptyText(t *testing.T) {
+	r := analyze.Result{}
+	points := analyze.DetectDrift(r)
+	if points != nil {
+		t.Errorf("expected nil for empty result")
+	}
+}
+
+func TestDetectDrift_SingleWord(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "terrible")
+	points := analyze.DetectDrift(r)
+
+	if len(points) != 1 {
+		t.Fatalf("points=%d, want 1", len(points))
+	}
+	if points[0].Score >= 0 {
+		t.Errorf("terrible should give negative score, got %f", points[0].Score)
+	}
+}
+
+func TestDetectDrift_MultipleWords(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "terrible good not terrible")
+	points := analyze.DetectDrift(r)
+
+	if len(points) != 4 {
+		t.Fatalf("points=%d, want 4", len(points))
+	}
+	// First point should be negative (terrible)
+	if points[0].Score >= 0 {
+		t.Errorf("first point should be negative, got %f", points[0].Score)
+	}
+}
+
+func TestSummarizeDrift_Empty(t *testing.T) {
+	s := analyze.SummarizeDrift(nil)
+	if s.Pattern != "STABLE" {
+		t.Errorf("empty should be STABLE, got %s", s.Pattern)
+	}
+}
+
+func TestSummarizeDrift_StableText(t *testing.T) {
+	lex := buildTestLex(t)
+	r := analyze.Analyze(lex, "xyz xyz xyz")
+	points := analyze.DetectDrift(r)
+	s := analyze.SummarizeDrift(points)
+
+	if s.Pattern != "STABLE" {
+		t.Errorf("all unknown text should be STABLE, got %s", s.Pattern)
+	}
+	if s.Volatility != 0 {
+		t.Errorf("volatility=%f, want 0", s.Volatility)
+	}
+}
+
+// ── CrossLingualScore tests ──────────────────────────────────────────────────
+
+func TestCrossLingualScore_KnownWord(t *testing.T) {
+	lex := buildTestLex(t)
+	pol, conf, nLangs := analyze.CrossLingualScore(lex, "terrible")
+
+	if pol != "NEGATIVE" {
+		t.Errorf("terrible should be NEGATIVE, got %s", pol)
+	}
+	if conf <= 0 {
+		t.Errorf("confidence should be > 0, got %f", conf)
+	}
+	if nLangs < 1 {
+		t.Errorf("should have at least 1 language, got %d", nLangs)
+	}
+}
+
+func TestCrossLingualScore_UnknownWord(t *testing.T) {
+	lex := buildTestLex(t)
+	pol, conf, nLangs := analyze.CrossLingualScore(lex, "xyzabc")
+
+	if pol != "UNKNOWN" {
+		t.Errorf("unknown word should be UNKNOWN, got %s", pol)
+	}
+	if conf != 0 {
+		t.Errorf("confidence should be 0, got %f", conf)
+	}
+	if nLangs != 0 {
+		t.Errorf("nLangs should be 0, got %d", nLangs)
+	}
+}
+
+func TestCrossLingualScore_PositiveWord(t *testing.T) {
+	lex := buildTestLex(t)
+	pol, _, _ := analyze.CrossLingualScore(lex, "good")
+	if pol != "POSITIVE" {
+		t.Errorf("good should be POSITIVE, got %s", pol)
+	}
+}
