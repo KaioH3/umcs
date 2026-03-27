@@ -41,6 +41,7 @@ type Word struct {
 	FreqRank    uint32
 	Flags       uint32 // low bits: register/onto/polysemy/cultural; high bits: phonology
 	Pron        string // IPA pronunciation string (may be empty)
+	Source      string // dataset provenance (e.g. "OpLexicon", "CogNet", "UniMorph")
 }
 
 // LoadRoots reads roots.csv and returns all root records.
@@ -282,6 +283,7 @@ func LoadWords(path string) ([]Word, error) {
 		flags = infer.FillPhonology(flags, wordStr, langStr)
 
 		pronStr := strings.TrimSpace(col(row, idx, "pron"))
+		sourceStr := strings.TrimSpace(col(row, idx, "source"))
 
 		words = append(words, Word{
 			WordID:    wordID,
@@ -294,6 +296,7 @@ func LoadWords(path string) ([]Word, error) {
 			FreqRank:  freqRank,
 			Flags:     flags,
 			Pron:      pronStr,
+			Source:    sourceStr,
 		})
 	}
 	return words, nil

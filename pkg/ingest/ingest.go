@@ -1300,7 +1300,7 @@ func WriteCSV(path string, entries []Entry, nextWordID, defaultRootID int) error
 			"polarity", "intensity", "semantic_role", "domain", "freq_rank",
 			"flags", "pos", "arousal", "dominance", "aoa", "concreteness",
 			"register", "ontological", "polysemy", "pron", "syllables",
-			"stress", "valency", "irony_capable", "neologism",
+			"stress", "valency", "irony_capable", "neologism", "source",
 		})
 	}
 
@@ -1331,6 +1331,7 @@ func WriteCSV(path string, entries []Entry, nextWordID, defaultRootID int) error
 			e.IPA,
 			syllStr,
 			"", "", "", "", // stress, valency, irony_capable, neologism
+			e.Source,
 		})
 		id++
 	}
