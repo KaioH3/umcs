@@ -63,9 +63,19 @@ const (
 	LangSA uint32 = 1 << 21 // Sanskrit (Indo-Aryan; Devanagari; classical ancestor)
 	LangTA uint32 = 1 << 22 // Tamil (Dravidian; Tamil script)
 	LangHE uint32 = 1 << 23 // Hebrew (Semitic; RTL; trilateral root system)
-	// bits 24..31 reserved
+	// Bits 24..31: overflow languages (top 8 by corpus size from imported datasets).
+	LangLA uint32 = 1 << 24 // Latin (classical; Romance ancestor)
+	LangFI uint32 = 1 << 25 // Finnish (Uralic; agglutinative)
+	LangDA uint32 = 1 << 26 // Danish (Germanic; Scandinavian)
+	LangHU uint32 = 1 << 27 // Hungarian (Uralic; agglutinative)
+	LangSV uint32 = 1 << 28 // Swedish (Germanic; Scandinavian)
+	LangCA uint32 = 1 << 29 // Catalan (Romance; Iberian)
+	LangRO uint32 = 1 << 30 // Romanian (Romance; Balkan)
+	LangCS uint32 = 1 << 31 // Czech (Slavic; Latin script)
 
 	// Word.Lang values (IDs, not bitmasks — stored in WordRecord.Lang).
+	// IDs 0..31 have corresponding LangCoverage bitmask bits.
+	// IDs 32+ work for lookup but don't get a LangCoverage bit.
 	WordLangPT uint32 = 0
 	WordLangEN uint32 = 1
 	WordLangES uint32 = 2
@@ -90,6 +100,52 @@ const (
 	WordLangSA uint32 = 21
 	WordLangTA uint32 = 22
 	WordLangHE uint32 = 23
+	WordLangLA uint32 = 24 // Latin
+	WordLangFI uint32 = 25 // Finnish
+	WordLangDA uint32 = 26 // Danish
+	WordLangHU uint32 = 27 // Hungarian
+	WordLangSV uint32 = 28 // Swedish
+	WordLangCA uint32 = 29 // Catalan
+	WordLangRO uint32 = 30 // Romanian
+	WordLangCS uint32 = 31 // Czech
+	WordLangGL uint32 = 32 // Galician
+	WordLangMS uint32 = 33 // Malay
+	WordLangSK uint32 = 34 // Slovak
+	WordLangSL uint32 = 35 // Slovenian
+	WordLangHR uint32 = 36 // Croatian
+	WordLangBG uint32 = 37 // Bulgarian
+	WordLangGU uint32 = 38 // Gujarati
+	WordLangEL uint32 = 39 // Greek
+	WordLangIS uint32 = 40 // Icelandic
+	WordLangPA uint32 = 41 // Punjabi
+	WordLangKN uint32 = 42 // Kannada
+	WordLangNE uint32 = 43 // Nepali
+	WordLangEU uint32 = 44 // Basque
+	WordLangTH uint32 = 45 // Thai
+	WordLangVI uint32 = 46 // Vietnamese
+	WordLangGA uint32 = 47 // Irish
+	WordLangMK uint32 = 48 // Macedonian
+	WordLangTE uint32 = 49 // Telugu
+	WordLangAF uint32 = 50 // Afrikaans
+	WordLangUR uint32 = 51 // Urdu
+	WordLangNO uint32 = 52 // Norwegian
+	WordLangSQ uint32 = 53 // Albanian
+	WordLangML uint32 = 54 // Malayalam
+	WordLangMR uint32 = 55 // Marathi
+	WordLangKA uint32 = 56 // Georgian
+	WordLangTL uint32 = 57 // Tagalog
+	WordLangHY uint32 = 58 // Armenian
+	WordLangCY uint32 = 59 // Welsh
+	WordLangMT uint32 = 60 // Maltese
+	WordLangBS uint32 = 61 // Bosnian
+	WordLangAM uint32 = 62 // Amharic
+	WordLangET uint32 = 63 // Estonian
+	WordLangSR uint32 = 64 // Serbian
+	WordLangLV uint32 = 65 // Latvian
+	WordLangLT uint32 = 66 // Lithuanian
+	WordLangAZ uint32 = 67 // Azerbaijani
+	WordLangLB uint32 = 68 // Luxembourgish
+	WordLangSI uint32 = 69 // Sinhala
 
 	// Word.Flags bitmask.
 	//
@@ -209,31 +265,47 @@ type WordRecord struct {
 	PronOffset uint32 // IPA pronunciation offset in heap (0 = none) [v2]
 }
 
+// langNames maps lang IDs (array index) to ISO 639-1 codes.
+// IDs 0–31 have LangCoverage bitmask bits; 32+ are lookup-only.
+var langNames = []string{
+	"PT", "EN", "ES", "IT", "DE", "FR", "NL", "AR", // 0–7
+	"ZH", "JA", "RU", "KO", "TG", "HI", "BN", "ID", // 8–15
+	"TR", "FA", "SW", "UK", "PL", "SA", "TA", "HE", // 16–23
+	"LA", "FI", "DA", "HU", "SV", "CA", "RO", "CS", // 24–31
+	"GL", "MS", "SK", "SL", "HR", "BG", "GU", "EL", // 32–39
+	"IS", "PA", "KN", "NE", "EU", "TH", "VI", "GA", // 40–47
+	"MK", "TE", "AF", "UR", "NO", "SQ", "ML", "MR", // 48–55
+	"KA", "TL", "HY", "CY", "MT", "BS", "AM", "ET", // 56–63
+	"SR", "LV", "LT", "AZ", "LB", "SI",             // 64–69
+}
+
+// langIndex maps ISO 639-1 codes to lang IDs (built once from langNames).
+var langIndex map[string]uint32
+
+func init() {
+	langIndex = make(map[string]uint32, len(langNames))
+	for i, name := range langNames {
+		langIndex[name] = uint32(i)
+	}
+}
+
 // LangName maps a lang ID to its ISO 639-1/639-2 code.
 func LangName(lang uint32) string {
-	names := []string{
-		"PT", "EN", "ES", "IT", "DE", "FR", "NL", "AR",
-		"ZH", "JA", "RU", "KO", "TG", "HI", "BN", "ID",
-		"TR", "FA", "SW", "UK", "PL", "SA", "TA", "HE",
-	}
-	if int(lang) < len(names) {
-		return names[lang]
+	if int(lang) < len(langNames) {
+		return langNames[lang]
 	}
 	return "??"
 }
 
 // ParseLang converts a language code to its lang ID.
 func ParseLang(s string) (uint32, bool) {
-	langs := map[string]uint32{
-		"PT": WordLangPT, "EN": WordLangEN, "ES": WordLangES, "IT": WordLangIT,
-		"DE": WordLangDE, "FR": WordLangFR, "NL": WordLangNL, "AR": WordLangAR,
-		"ZH": WordLangZH, "JA": WordLangJA, "RU": WordLangRU, "KO": WordLangKO,
-		"TG": WordLangTG, "HI": WordLangHI, "BN": WordLangBN, "ID": WordLangID,
-		"TR": WordLangTR, "FA": WordLangFA, "SW": WordLangSW, "UK": WordLangUK,
-		"PL": WordLangPL, "SA": WordLangSA, "TA": WordLangTA, "HE": WordLangHE,
-	}
-	id, ok := langs[s]
+	id, ok := langIndex[s]
 	return id, ok
+}
+
+// LangCount returns the total number of supported languages.
+func LangCount() int {
+	return len(langNames)
 }
 
 // LangBit converts a lang ID to its bitmask flag.

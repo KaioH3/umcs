@@ -55,6 +55,15 @@ func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, e
 		m.langCoverage |= langBit
 	}
 
+	// Track extended languages (ID >= 32, no bitmask bit).
+	extLangs := make(map[uint32]bool)
+	for _, w := range words {
+		langID, ok := ParseLang(w.Lang)
+		if ok && langID >= 32 {
+			extLangs[langID] = true
+		}
+	}
+
 	// Build RootRecords
 	rootRecords := make([]RootRecord, len(roots))
 	var globalLangFlags uint32
@@ -183,39 +192,35 @@ func Build(roots []seed.Root, words []seed.Word, outPath string) (*BuildStats, e
 
 	fi, _ := f.Stat()
 	return &BuildStats{
-		RootCount: len(rootRecords),
-		WordCount: len(wordRecords),
-		HeapSize:  len(heap.bytes()),
-		FileSize:  fi.Size(),
-		LangFlags: globalLangFlags,
+		RootCount:    len(rootRecords),
+		WordCount:    len(wordRecords),
+		HeapSize:     len(heap.bytes()),
+		FileSize:     fi.Size(),
+		LangFlags:    globalLangFlags,
+		ExtLangCount: len(extLangs),
 	}, nil
 }
 
 // BuildStats contains summary information after a successful build.
 type BuildStats struct {
-	RootCount int
-	WordCount int
-	HeapSize  int
-	FileSize  int64
-	LangFlags uint32
+	RootCount    int
+	WordCount    int
+	HeapSize     int
+	FileSize     int64
+	LangFlags    uint32
+	ExtLangCount int // languages with ID >= 32 (no bitmask bit)
 }
 
 func (s *BuildStats) Langs() string {
 	var out []string
-	if s.LangFlags&LangPT != 0 {
-		out = append(out, "PT")
+	for i := uint32(0); i < 32; i++ {
+		if s.LangFlags&(1<<i) != 0 {
+			out = append(out, LangName(i))
+		}
 	}
-	if s.LangFlags&LangEN != 0 {
-		out = append(out, "EN")
-	}
-	if s.LangFlags&LangES != 0 {
-		out = append(out, "ES")
-	}
-	if s.LangFlags&LangIT != 0 {
-		out = append(out, "IT")
-	}
-	if s.LangFlags&LangDE != 0 {
-		out = append(out, "DE")
+	// Also report extended languages (ID >= 32) if tracked separately.
+	if s.ExtLangCount > 0 {
+		out = append(out, fmt.Sprintf("+%d more", s.ExtLangCount))
 	}
 	return strings.Join(out, " ")
 }
