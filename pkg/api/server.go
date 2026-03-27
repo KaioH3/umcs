@@ -45,6 +45,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/roots", s.handleRoots)
 	mux.HandleFunc("/root/", s.handleRoot)
 	mux.HandleFunc("/sentiment/decode", s.handleSentimentDecode)
+	mux.HandleFunc("/emotion", s.handleEmotion)
+	mux.HandleFunc("/drift", s.handleDrift)
+	mux.HandleFunc("/crosslingual", s.handleCrossLingual)
 	return mux
 }
 
@@ -590,6 +593,109 @@ func httpErr(w http.ResponseWriter, msg string, code int) {
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
 		log.Printf("httpErr encode error: %v", err)
 	}
+}
+
+// handleEmotion decomposes text into Plutchik emotion profile.
+// GET /emotion?text=...
+func (s *Server) handleEmotion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	text := r.URL.Query().Get("text")
+	if text == "" && r.Method == http.MethodPost {
+		var err error
+		text, err = readBody(r)
+		if err != nil {
+			httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if text == "" {
+		httpErr(w, "missing text", 400)
+		return
+	}
+
+	result := analyze.Analyze(s.lex, text)
+	ep := analyze.EmotionDecompose(result, s.lex)
+
+	jsonOK(w, map[string]any{
+		"text":     text,
+		"verdict":  result.Verdict,
+		"score":    result.TotalScore,
+		"dominant": ep.Dominant,
+		"emotions": map[string]float64{
+			"joy":      ep.Joy,
+			"trust":    ep.Trust,
+			"fear":     ep.Fear,
+			"anger":    ep.Anger,
+			"sadness":  ep.Sadness,
+			"surprise": ep.Surprise,
+			"disgust":  ep.Disgust,
+			"serenity": ep.Serenity,
+		},
+	})
+}
+
+// handleDrift analyzes sentiment trajectory across text.
+// GET /drift?text=...
+func (s *Server) handleDrift(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	text := r.URL.Query().Get("text")
+	if text == "" && r.Method == http.MethodPost {
+		var err error
+		text, err = readBody(r)
+		if err != nil {
+			httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if text == "" {
+		httpErr(w, "missing text", 400)
+		return
+	}
+
+	result := analyze.Analyze(s.lex, text)
+	points := analyze.DetectDrift(result)
+	summary := analyze.SummarizeDrift(points)
+
+	jsonOK(w, map[string]any{
+		"text":    text,
+		"verdict": result.Verdict,
+		"pattern": summary.Pattern,
+		"summary": map[string]any{
+			"max_positive": summary.MaxPositive,
+			"max_negative": summary.MaxNegative,
+			"volatility":  summary.Volatility,
+			"shifts":      summary.Shifts,
+		},
+		"points": points,
+	})
+}
+
+// handleCrossLingual returns cross-lingual sentiment consensus for a word.
+// GET /crosslingual?word=...
+func (s *Server) handleCrossLingual(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	word := r.URL.Query().Get("word")
+	if word == "" {
+		httpErr(w, "missing ?word=", 400)
+		return
+	}
+
+	polarity, confidence, nLangs := analyze.CrossLingualScore(s.lex, word)
+	jsonOK(w, map[string]any{
+		"word":       word,
+		"polarity":   polarity,
+		"confidence": confidence,
+		"languages":  nLangs,
+	})
 }
 
 func readBody(r *http.Request) (string, error) {
