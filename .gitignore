@@ -4,6 +4,19 @@ dumps/
 data/.discover_checkpoint.json
 data/staged.csv
 
+# External datasets (too large for git)
+data/external/
+
+# Build artifacts
+*.so
+*.h
+*.out
+coverage.out
+models/
+
+# Backups
+*.bak
+
 # OS
 .DS_Store
 Thumbs.db
@@ -16,3 +29,6 @@ Thumbs.db
 
 # Go
 vendor/
+
+# Old capi directory
+/capi
