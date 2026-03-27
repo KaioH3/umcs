@@ -4,6 +4,7 @@
 dumps/
 data/.discover_checkpoint.json
 data/staged.csv
+data/imported_words.csv
 
 # External datasets (too large for git)
 data/external/
