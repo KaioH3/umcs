@@ -4,12 +4,15 @@
 
 [![Go](https://img.shields.io/badge/Go-1.24-blue?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-18_packages-brightgreen)]()
+[![Languages](https://img.shields.io/badge/languages-24+-orange)]()
+[![Words](https://img.shields.io/badge/imported_words-656K+-purple)]()
 
 ---
 
 ## What is UMCS?
 
-UMCS assigns every word in every language a **deterministic coordinate** based on its etymological root. Words that share the same ancestor share the same coordinate prefix — regardless of language, script, or script family.
+UMCS assigns every word in every language a **deterministic coordinate** based on its etymological root. Words that share the same ancestor share the same coordinate prefix — regardless of language, script, or writing system.
 
 ```
 "terrible" (EN) → word_id = 40961   (root_id=10, variant=1)
@@ -19,24 +22,25 @@ UMCS assigns every word in every language a **deterministic coordinate** based o
 "terrible"  (ES) → word_id = 40965   (root_id=10, variant=5)
 ```
 
-Same root (`terr`, Latin *terror*) = same embedding slot in any model. Cognates across PT/EN/ES/FR/IT/DE/NL/AR/ZH/JA/RU/KO/TG/HI/SA and more are linked by this ID automatically.
+Same root (`terr`, Latin *terror*) = same embedding slot in any model. No translation step. No alignment. One bit shift and you know two words are cognates.
 
 ---
 
-## Why not VADER / spaCy / regex lists?
+## Why UMCS?
 
-| Feature | UMCS | VADER | spaCy | Regex |
-|---------|------|-------|-------|-------|
-| Cross-lingual single lookup | ✓ | ✗ | ✗ | ✗ |
-| O(1) lookup, no model load | ✓ | ✗ | ✗ | ✓ |
-| Scope-aware sentiment (negation, intensifiers) | ✓ | ✓ | ✓ | ✗ |
-| Etymology chains | ✓ | ✗ | ✗ | ✗ |
-| Embeddable binary (<5 MB) | ✓ | ✗ | ✗ | ✓ |
-| HuggingFace vocab export | ✓ | ✗ | ✗ | ✗ |
-| No Python runtime | ✓ | ✗ | ✗ | ✓ |
-| Part-of-speech, arousal, dominance, AoA | ✓ | ✗ | partial | ✗ |
-| VAD psychological model (Valence-Arousal-Dominance) | ✓ | ✗ | ✗ | ✗ |
-| Tupi-Guaraní, Sanskrit, Arabic, Hindi | ✓ | ✗ | partial | ✗ |
+| Feature | UMCS | VADER | spaCy | Regex | DistilBERT |
+|---------|------|-------|-------|-------|------------|
+| Cross-lingual single lookup | **O(1)** | - | - | - | - |
+| Scope-aware sentiment (negation, intensifiers) | yes | yes | yes | - | yes |
+| Etymology chains to proto-language | yes | - | - | - | - |
+| Emotion decomposition (Plutchik) | yes | - | - | - | - |
+| Sentiment drift detection | yes | - | - | - | - |
+| Embeddable binary (<200 KB) | yes | - | - | yes | - |
+| HuggingFace vocab export | yes | - | - | - | - |
+| No Python / No GPU | yes | - | - | yes | - |
+| 11 semantic dimensions per word | yes | - | partial | - | - |
+| C FFI (libumcs.so) | yes | - | - | - | - |
+| 24+ languages, 50+ via datasets | yes | - | partial | - | yes |
 
 ---
 
@@ -45,27 +49,117 @@ Same root (`terr`, Latin *terror*) = same embedding slot in any model. Cognates 
 ```
 Input text
   │
-  ▼ Normalize() — lowercase + diacritic strip
-  │  café→cafe  straße→strasse  terrível→terrivel  Tupã→tupa
+  ▼ normalize() — lowercase + diacritic strip
+  │  café→cafe  straße→strasse  terrível→terrivel
   │
   ▼ lexdb.LookupWord() — O(1) hash map
   │  WordRecord{ word_id, root_id, Sentiment uint32, Flags uint32 }
   │
-  ▼ morpheme.Pack64() — pack into Token64
-  │  uint64: root_id(20b) | variant(12b) | pos(3b) | concrete(1b) |
-  │          scope(4b) | role(4b) | intensity(4b) | ontological(4b) |
-  │          register(4b) | polarity(2b) | arousal(2b) | dominance(2b) | aoa(2b)
+  ▼ morpheme.Pack64() — pack into Token64 (uint64)
+  │  root_id(20b) | variant(12b) | pos(3b) | concrete(1b) |
+  │  scope(4b) | role(4b) | intensity(4b) | ontological(4b) |
+  │  register(4b) | polarity(2b) | arousal(2b) | dominance(2b) | aoa(2b)
   │
   ▼ analyze.Analyze() — scope resolution
-     negation window=3, intensifier 2×, downtoner 0.5×
-     → Result{ TotalScore, Verdict, Tokens[] }
+  │  negation window=3 tokens, intensifier 2×, downtoner 0.5×
+  │
+  ▼ Result{ TotalScore, Verdict, Tokens[], Emotions[], Drift[] }
+```
+
+---
+
+## Installation
+
+```bash
+git clone https://github.com/KaioH3/umcs.git
+cd umcs
+go build -o lexsent ./cmd/lexsent
+
+# Build the binary lexicon from CSV data
+./lexsent build --roots data/roots.csv --words data/words.csv --out lexicon.umcs
+```
+
+**Requirements:** Go 1.24+. No external dependencies besides the standard library.
+
+---
+
+## Quick Start
+
+### CLI
+
+```bash
+# Look up a word (diacritics stripped automatically)
+./lexsent lookup terrível
+./lexsent lookup café
+
+# Language-specific lookup (disambiguates homographs)
+./lexsent lookup mais --lang PT   # PT: mais = more
+./lexsent lookup mais --lang FR   # FR: mais = but
+
+# All cognates across languages (same root)
+./lexsent cognates terrible
+
+# Etymology chain: root → parent → proto-language
+./lexsent etymo philosophy
+
+# Scope-aware sentiment analysis
+./lexsent analyze "this product is not terrible at all"
+./lexsent analyze "muito bom, recomendo"
+
+# Lexicon stats + most productive roots
+./lexsent stats --productive
+
+# Start REST API server
+./lexsent serve --port 8080
+```
+
+### REST API
+
+```bash
+# Health check
+curl localhost:8080/health
+
+# Lookup with diacritic normalization
+curl "localhost:8080/lookup?word=caf%C3%A9"
+
+# Sentiment analysis with negation scope
+curl -X POST localhost:8080/analyze -d "this product is not terrible at all"
+
+# Emotion decomposition (Plutchik wheel: 8 emotions)
+curl "localhost:8080/emotion?text=I+am+furious+and+terrified"
+
+# Sentiment drift detection (trajectory patterns)
+curl -X POST localhost:8080/drift -d "started great, then terrible, awful ending"
+
+# Cross-lingual sentiment consensus
+curl "localhost:8080/crosslingual?word=terrible"
+
+# Batch analysis (up to 100 texts)
+curl -X POST localhost:8080/analyze/batch \
+  -H 'Content-Type: application/json' \
+  -d '[{"text":"terrible service"},{"text":"serviço terrível"},{"text":"servicio terrible"}]'
+
+# Etymology chain
+curl "localhost:8080/etymo?word=terrible"
+
+# Cognate family grouped by language
+curl "localhost:8080/cognates?word=negative"
+
+# Decode a sentiment bitmask
+curl "localhost:8080/sentiment/decode?s=0x60130140"
+
+# HuggingFace-compatible vocab export
+curl localhost:8080/vocab > umcs_vocab.json
+
+# Root enumeration with pagination
+curl "localhost:8080/roots?limit=10&offset=0&productive=true"
 ```
 
 ---
 
 ## The Token64 — one number, everything
 
-The crown jewel of UMCS: a single `uint64` that encodes the **complete semantic identity** of a word. A language model that receives this token can decode every dimension without any lookup table.
+A single `uint64` that encodes the **complete semantic identity** of a word. No lookup table needed.
 
 ```
  63      44 43      32 31 29 28 27  24 23  20 19  16 15  12 11   8 7 6 5 4 3 2 1 0
@@ -78,46 +172,52 @@ The crown jewel of UMCS: a single `uint64` that encodes the **complete semantic 
  C = concrete (1b)   pos = part-of-speech (3b)
 ```
 
-Example for `"terrible"` (EN, NEGATIVE STRONG EVALUATION, ADJ, HIGH arousal, LOW dominance):
 ```go
 tok := morpheme.Pack64(word.WordID, word.Sentiment, word.Flags)
-// → 0x0002800013014020
+// "terrible" → 0x0002800013014020
 //   root=10 var=1 pos=ADJ polarity=NEGATIVE intensity=STRONG
 //   role=EVALUATION arousal=HIGH dominance=LOW aoa=MID concrete=true
 ```
 
 ---
 
-## Semantic dimensions packed per word
+## Semantic Dimensions (32 bits, zero wasted)
 
-### In `sentiment` uint32 (complete — no bits wasted):
+### Sentiment bitmask (`uint32`)
 
 | Bits | Dimension | Values |
 |------|-----------|--------|
-| 31..29 | **POS** | NOUN/VERB/ADJ/ADV/PARTICLE/PREP/CONJ |
+| 31..29 | **POS** | NOUN / VERB / ADJ / ADV / PARTICLE / PREP / CONJ |
 | 28 | **Concreteness** | 1=concrete (chair), 0=abstract (freedom) |
 | 27..24 | **Scope flags** | INTENSIFIER / DOWNTONER / NEGATION / AFFIRMATION |
-| 23..20 | **Semantic role** | EVALUATION/EMOTION/COGNITION/VOLITION/CAUSATION/TEMPORAL/QUANTIFIER/CONNECTOR/NEGATION_MARKER/INTENSIFIER/DOWNTONER |
+| 23..20 | **Semantic role** | EVALUATION / EMOTION / COGNITION / VOLITION / CAUSATION / TEMPORAL / QUANTIFIER / CONNECTOR |
 | 19..16 | **Intensity** | NONE / WEAK / MODERATE / STRONG / EXTREME |
-| 15..8 | **Domain** | GENERAL/FINANCIAL/MEDICAL/LEGAL/TECHNICAL/SOCIAL/POLITICAL/ACADEMIC |
+| 15..8 | **Domain** | GENERAL / FINANCIAL / MEDICAL / LEGAL / TECHNICAL / SOCIAL / POLITICAL / ACADEMIC |
 | 7..6 | **Polarity** | NEUTRAL / POSITIVE / NEGATIVE / AMBIGUOUS |
-| 5..4 | **Arousal** | NONE/LOW/MED/HIGH — psycholinguistic activation axis |
-| 3..2 | **Dominance** | NONE/LOW/MED/HIGH — power/control axis (VAD model) |
-| 1..0 | **AoA** | EARLY/MID/LATE/TECHNICAL — age of acquisition |
+| 5..4 | **Arousal** | NONE / LOW / MED / HIGH (psycholinguistic activation) |
+| 3..2 | **Dominance** | NONE / LOW / MED / HIGH (power/control — VAD model) |
+| 1..0 | **AoA** | EARLY / MID / LATE / TECHNICAL (age of acquisition) |
 
-### In `flags` uint32:
+### Flags bitmask (`uint32`)
 
 | Bits | Dimension | Values |
 |------|-----------|--------|
-| 7..0 | **Lexical flags** | Proper/Archaic/Colloquial/Domain/FalseFriend/Loanword/Allomorph/Onomatopoeia |
-| 11..8 | **Register** | NEUTRAL/FORMAL/INFORMAL/SLANG/VULGAR/ARCHAIC/POETIC/TECHNICAL/SCIENTIFIC/CHILD/REGIONAL |
-| 15..12 | **Ontological** | NONE/PERSON/PLACE/ARTIFACT/NATURAL/EVENT/STATE/PROPERTY/QUANTITY/RELATION/TEMPORAL/BIOLOGICAL/SOCIAL/ABSTRACT |
-| 19..16 | **Polysemy** | Count of distinct senses (0=unknown, max 15) |
+| 7..0 | **Lexical flags** | Proper / Archaic / Colloquial / Domain / FalseFriend / Loanword / Allomorph / Onomatopoeia |
+| 11..8 | **Register** | NEUTRAL / FORMAL / INFORMAL / SLANG / VULGAR / ARCHAIC / POETIC / TECHNICAL / SCIENTIFIC |
+| 15..12 | **Ontological** | PERSON / PLACE / ARTIFACT / NATURAL / EVENT / STATE / PROPERTY / QUANTITY / RELATION |
+| 19..16 | **Polysemy** | Count of distinct senses (0–15) |
 | 20 | **Cultural-specific** | 1 = no equivalent in most languages (saudade, schadenfreude) |
+| 31..28 | **Syllable count** | 0=unknown, 1–15 |
+| 27..26 | **Stress pattern** | unknown / final / penultimate / antepenultimate |
+| 25..23 | **Valency** | NA / intransitive / transitive / ditransitive / copular / modal |
+| 22 | **Irony-capable** | 1 = participates in ironic inversion |
+| 21 | **Neologism** | 1 = coined post-1990 |
 
 ---
 
-## Languages supported (24)
+## Languages (24 core + 50 via datasets)
+
+### Core languages (manually annotated)
 
 | Code | Language | Script | Family |
 |------|----------|--------|--------|
@@ -146,104 +246,235 @@ tok := morpheme.Pack64(word.WordID, word.Sentiment, word.Flags)
 | TA | Tamil | Tamil | Dravidian |
 | HE | Hebrew | Hebrew | Semitic |
 
-The binary format reserves 32 language slots — 8 remain free for future additions.
+### Extended via CogNet / EtymWn / ML-Senticon (50+ additional)
+
+Bulgarian, Catalan, Croatian, Czech, Danish, Estonian, Finnish, Galician, Georgian, Greek, Hungarian, Icelandic, Irish, Latvian, Lithuanian, Macedonian, Maltese, Norwegian, Romanian, Serbian, Slovak, Slovenian, Albanian, Afrikaans, Swedish, Thai, Vietnamese, Malay, Basque, Welsh, Armenian, Amharic, Tagalog, Bosnian, and more.
 
 ---
 
-## Lexicon stats (current)
+## Data Pipeline
 
-| Metric | Value |
-|--------|-------|
-| Root families | 121 |
-| Word entries | 1,396 |
-| Languages | 24 |
-| Theoretical capacity | ~1M roots × 4K variants = **4 billion word_ids** |
-| Binary size (lexicon.umcs) | ~0.2 MB |
+### Curated data (hand-annotated)
 
----
+| File | Records | Description |
+|------|---------|-------------|
+| `data/roots.csv` | 365 | Root families with etymology, meanings, semantic relations |
+| `data/words.csv` | 2,442 | Words across 24 languages, fully annotated |
 
-## Installation
+### Imported datasets (656K+ entries)
+
+The `cmd/import-new` pipeline imports from 20+ external datasets, merges, deduplicates, enriches with IPA pronunciations, and appends to `data/imported_words.csv`.
+
+#### Phase 1 — Sentiment-bearing datasets
+
+| Dataset | Language | Records | What it provides |
+|---------|----------|---------|-----------------|
+| **OpLexicon v3.0** | PT | ~32K | POS + polarity (Brazilian Portuguese) |
+| **SentiLex-PT02** | PT | ~7K | Sentiment lemmas (European Portuguese) |
+| **MPQA** | EN | ~6.9K | Subjectivity clues (strong/weak, prior polarity) |
+| **ML-Senticon** | EN/ES/CA/EU/GL | ~5K/lang | XML sentiment lexicons with continuous polarity |
+| **SO-CAL** | EN/ES | ~6K | Semantic orientation [-5,+5] by POS |
+| **NRC VAD Lexicon** | EN | ~54K | Valence, arousal, dominance (continuous) |
+| **NRC Emotion Lexicon** | 100+ langs | ~14K | 8 Plutchik emotions per word |
+| **AFINN-165** | EN | ~3.3K | Integer valence [-5,+5] |
+| **VADER** | EN | ~7.5K | Mean sentiment with SD |
+| **Bing Liu** | EN | ~6.8K | Binary polarity (positive/negative lists) |
+| **SentiWordNet 3.0** | EN | ~117K | WordNet synset sentiment scores |
+| **Warriner VAD** | EN | ~13.9K | VAD norms with standard deviations |
+| **81-language sentiment** | 81 langs | varies | Multilingual polarity annotations |
+| **Empath** | EN | ~194 cats | 194 semantic categories |
+
+#### Phase 2 — Morphological / phonological datasets
+
+| Dataset | Language | Records | What it provides |
+|---------|----------|---------|-----------------|
+| **Lexique383** | FR | ~143K | French phonology, syllables, frequency |
+| **UniMorph** | EN/PT/ES/DE/FR | ~100K+ | Morphological inflection tables |
+| **MorphoLex** | EN | ~31K | Morphological families with POS |
+| **Brysbaert Concreteness** | EN | ~40K | Concreteness [1–5] + SUBTLEX frequency |
+| **IPA-dict** | 10 langs | ~500K | IPA pronunciations |
+| **CMUDict** | EN | ~134K | ARPABET → IPA pronunciations |
+
+#### Phase 3 — Cross-lingual / etymological datasets
+
+| Dataset | Languages | Records | What it provides |
+|---------|-----------|---------|-----------------|
+| **CogNet v2.0** | 338 langs | ~3.1M | Cognate pairs with concept IDs |
+| **EtymWn** | 50+ langs | ~6M | Etymological relations (inheritance, borrowing, derivation) |
+
+### Import pipeline
 
 ```bash
-# Build from source (requires Go 1.24+)
-git clone https://github.com/KaioH3/umcs.git
-cd umcs
-go build -o lexsent ./cmd/lexsent
+# Build the import tool
+go build -o import-new ./cmd/import-new
 
-# Build the binary lexicon from CSV data
-./lexsent build --roots data/roots.csv --words data/words.csv --out lexicon.umcs
+# Run (reads from data/external/, appends to data/imported_words.csv)
+UMCS_ROOT=. ./import-new
+```
+
+The pipeline:
+1. Reads each dataset with format-specific parsers
+2. Normalizes words (lowercase, diacritic strip, single-word filter)
+3. Maps polarity/intensity to UMCS scale
+4. Enriches with IPA from IPA-dict + CMUDict (fallback)
+5. Merges and deduplicates by `(norm, lang)`
+6. Excludes entries already in the CSV
+7. Appends new entries with sequential `word_id`
+
+---
+
+## Architecture
+
+```
+umcs/
+├── cmd/
+│   ├── lexsent/          # Main CLI (12 commands)
+│   └── import-new/       # Dataset import pipeline
+├── pkg/
+│   ├── lexdb/            # Binary .umcs format (reader, writer, header)
+│   ├── morpheme/         # word_id encoding (root+variant) + Token64
+│   ├── sentiment/        # 32-bit bitmask packing (11 dimensions)
+│   ├── tokenizer/        # Morpheme-aware tokenization
+│   ├── analyze/          # Sentiment analysis + emotion + drift
+│   ├── classify/         # Logistic regression (48D features, Adam optimizer)
+│   ├── api/              # REST API server (16 endpoints)
+│   ├── ingest/           # 20+ dataset importers
+│   ├── infer/            # Morphological inference rules
+│   ├── discover/         # Wiktionary BFS discovery + XML dump parser
+│   ├── propagate/        # Cross-lingual sentiment propagation
+│   ├── seed/             # CSV loader (roots + words)
+│   ├── phon/             # Phonological features (syllables, stress, IPA)
+│   ├── ga/               # Genetic algorithm (tournament + elitism)
+│   ├── rl/               # REINFORCE policy gradient (online learning)
+│   ├── autoqa/           # Automated QA for text generation
+│   └── capi/             # C FFI exports (libumcs.so)
+├── data/
+│   ├── roots.csv         # 365 root families
+│   ├── words.csv         # 2,442 annotated words
+│   ├── imported_words.csv # 656K+ imported entries
+│   ├── staged.csv        # Pending human review
+│   └── external/         # Raw dataset files
+├── models/               # Trained classifier weights
+└── lexicon.umcs          # Compiled binary (~200 KB)
+```
+
+### Package responsibilities
+
+| Package | Purpose | Key types |
+|---------|---------|-----------|
+| `lexdb` | Binary format I/O, O(1) lookup | `Lexicon`, `WordRecord`, `RootRecord` |
+| `morpheme` | Word ID bit packing | `Token64`, `MakeWordID()`, `RootOf()` |
+| `sentiment` | Semantic dimension packing | `Pack()`, `Decode()`, `Weight()` |
+| `tokenizer` | Text → token sequence | `MorphToken`, `Tokenize()` |
+| `analyze` | Scope-aware sentiment scoring | `Result`, `EmotionProfile`, `DriftSummary` |
+| `classify` | ML classification (48 features) | `Classifier`, `Train()`, `Predict()` |
+| `ingest` | Dataset-specific parsers | `Entry`, `ImportOpLexicon()`, `Merge()` |
+| `infer` | Suffix/prefix → POS/concreteness | `FillMissing()` |
+| `discover` | Wiktionary crawler + staging | `Pipeline`, `Config` |
+| `propagate` | Cognate sentiment transfer | `Propagate()` |
+| `ga` | Genetic algorithm optimization | `Population`, `Evolve()` |
+| `rl` | REINFORCE feedback loop | `Agent`, `Act()`, `Observe()`, `Learn()` |
+| `autoqa` | Semantic validation for CI/CD | `CheckBatch()`, `OutputSpec` |
+| `capi` | C shared library interface | `umcs_load()`, `umcs_analyze()` |
+
+---
+
+## ML Pipeline
+
+### Classifier (48-dimensional feature extraction)
+
+The classifier extracts 48 features per token, organized into 8 groups:
+
+| Group | Features | Source |
+|-------|----------|--------|
+| **Sentiment** (0–5) | polarity, intensity, arousal, dominance, AoA, concreteness | VAD model (Warriner) |
+| **Phonology** (6–10) | irony flag, neologism, syllables, stress, valency | IPA analysis |
+| **Relations** (11–13) | has antonym/hypernym/synonym | Root-level links |
+| **Context** (14–16) | negation/intensifier/downtoner in window | Scope resolution |
+| **Semantic role** (17–27) | One-hot encoding of 11 roles | Annotation |
+| **Lexical** (28–36) | POS, register, ontological, lang, frequency, polysemy, cognate count | Lexicon |
+| **Phonaesthetics** (40–43) | C/V ratio, open vowels, nasals, sibilants | IPA parsing |
+| **Morphology** (44–45) | Etymology depth, family size | Root chains |
+
+Training uses Adam optimizer. Feature weights are tunable via genetic algorithm.
+
+### Genetic Algorithm
+
+Tournament selection (k=3) + elitism (top 8) + Gaussian mutation. Optimizes 48-dimensional weight vector against macro-averaged F1 on validation set.
+
+### REINFORCE (online learning)
+
+Policy gradient with baseline variance reduction (Williams 1992). Learns from user corrections in real-time:
+
+```
+Agent.Act(features) → prediction
+User corrects → Agent.Observe(feedback)
+Agent.Learn() → gradient update scaled by advantage
 ```
 
 ---
 
-## Quick Start
+## Analysis Features
 
-### CLI
+### Sentiment Analysis
+
+Scope-aware with three modifiers:
+- **Negation:** inverts polarity within 3-token window
+- **Intensifier:** 2× multiplier on next sentiment token
+- **Downtoner:** 0.5× multiplier on next sentiment token
+- **Double negation:** cancels out (affirmation)
 
 ```bash
-# Look up a word (diacritics stripped automatically)
-./lexsent lookup terrível
-./lexsent lookup café
-
-# Language-specific lookup (disambiguates homographs)
-./lexsent lookup mais --lang PT   # PT: mais=more
-./lexsent lookup mais --lang FR   # FR: mais=but
-
-# All cognates across languages (same root)
-./lexsent cognates terrible
-
-# Etymology chain: root → parent → proto-language
-./lexsent etymo philosophy
-
-# Scope-aware sentiment analysis
-./lexsent analyze "this product is not terrible at all"
-./lexsent analyze "muito bom, recomendo"
-
-# Lexicon stats + most productive roots
-./lexsent stats --productive
-
-# Start REST API server
-./lexsent serve --port 8080
+./lexsent analyze "not terrible"     # → POSITIVE (negation inverts NEGATIVE)
+./lexsent analyze "very terrible"    # → NEGATIVE, EXTREME (intensifier)
+./lexsent analyze "somewhat bad"     # → NEGATIVE, WEAK (downtoner)
 ```
 
-### REST API
+### Emotion Decomposition (Plutchik)
+
+Maps VAD dimensions to 8 primary emotions:
+
+| Emotion | Valence | Arousal | Dominance |
+|---------|---------|---------|-----------|
+| **Joy** | high | high | high |
+| **Trust** | positive | low | high |
+| **Fear** | negative | high | low |
+| **Anger** | negative | high | high |
+| **Sadness** | negative | low | low |
+| **Surprise** | any | high | any |
+| **Disgust** | strong neg | high | any |
+| **Serenity** | positive | low | any |
 
 ```bash
-# Health check (version, checksum, stats)
-curl localhost:8080/health
+curl "localhost:8080/emotion?text=I+am+furious+and+terrified"
+# → { "dominant": "ANGER", "emotions": {"anger": 0.85, "fear": 0.72, ...} }
+```
 
-# Lookup with diacritic normalization
-curl "localhost:8080/lookup?word=caf%C3%A9"
-curl "localhost:8080/lookup?word=mais&lang=PT"
+### Sentiment Drift Detection
 
-# Sentiment analysis with negation scope
-curl -X POST localhost:8080/analyze \
-  -d "this product is not terrible at all"
+Analyzes sentiment trajectory across a text and classifies patterns:
 
-# Cross-lingual batch analysis
-curl -X POST localhost:8080/analyze/batch \
-  -H 'Content-Type: application/json' \
-  -d '[{"text":"terrible service"},{"text":"serviço terrível"},{"text":"servicio terrible"}]'
+| Pattern | Description |
+|---------|-------------|
+| STABLE | Consistent sentiment throughout |
+| ASCENDING | Negative → Positive |
+| DESCENDING | Positive → Negative |
+| V-SHAPE | Positive → Negative → Positive |
+| INV-V | Negative → Positive → Negative |
+| VOLATILE | Rapid sentiment swings |
 
-# Etymology chain
-curl "localhost:8080/etymo?word=terrible"
+```bash
+curl -X POST localhost:8080/drift -d "Great start, then everything went wrong, disaster"
+# → { "pattern": "DESCENDING", "volatility": 0.73, "points": [...] }
+```
 
-# Cognate family grouped by language
-curl "localhost:8080/cognates?word=negative"
+### Cross-Lingual Consensus
 
-# Decode a sentiment bitmask
-curl "localhost:8080/sentiment/decode?s=0x60130140"
+Computes sentiment agreement across all languages that share a root:
 
-# Export HuggingFace-compatible vocab (word → word_id map)
-curl localhost:8080/vocab > umcs_vocab.json
-
-# Batch content moderation
-curl -X POST localhost:8080/lookup/batch \
-  -H 'Content-Type: application/json' \
-  -d '[{"word":"hate","lang":"EN"},{"word":"ódio","lang":"PT"},{"word":"haine","lang":"FR"}]'
-
-# Root list with pagination
-curl "localhost:8080/roots?limit=10&offset=0&productive=true"
+```bash
+curl "localhost:8080/crosslingual?word=terrible"
+# → { "polarity": "NEGATIVE", "confidence": 0.95, "languages": 5 }
 ```
 
 ---
@@ -253,101 +484,116 @@ curl "localhost:8080/roots?limit=10&offset=0&productive=true"
 | Command | Description |
 |---------|-------------|
 | `build` | Compile roots.csv + words.csv → binary .umcs |
-| `lookup <word>` | Word lookup with cognates and etymology |
+| `lookup <word>` | Word lookup with all metadata and cognates |
 | `cognates <word>` | Full morphological family across languages |
 | `etymo <word>` | Etymology chain to proto-language |
 | `analyze <text>` | Scope-aware sentiment analysis |
 | `tokenize <text>` | Morpheme tokenization with semantic encoding |
-| `stats` | Lexicon statistics |
-| `serve` | Launch REST API server |
-| `discover` | Automated word discovery from Wiktionary (live API) |
+| `stats [--productive]` | Lexicon statistics and root productivity |
+| `serve [--port N]` | Launch REST API server |
+| `discover` | Automated word discovery from Wiktionary |
 | `import` | Batch import from Wiktionary XML dump |
+| `train` | Train logistic regression classifier |
+| `predict` | Run classifier predictions |
+| `feedback` | Submit corrections for REINFORCE learning |
+| `evolve` | Genetic algorithm weight optimization |
+| `export-c` | Build C shared library (libumcs.so) |
+| `stage-review` | Review staged low-confidence discoveries |
 
 ---
 
-## REST API Reference
+## API Reference (16 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/health` | Status, version, checksum, root/word counts |
+| GET | `/health` | Status, version, checksum, counts |
 | GET | `/stats` | Full lexicon statistics |
-| GET | `/lookup?word=X&lang=EN` | Single word lookup |
-| POST | `/lookup/batch` | Batch lookup (up to 100 words) |
+| GET | `/lookup?word=X&lang=Y` | Single word lookup |
+| POST | `/lookup/batch` | Batch lookup (up to 100) |
 | GET | `/cognates?word=X` | Cognate family by language |
 | GET | `/etymo?word=X` | Etymology chain |
-| GET/POST | `/analyze` | Sentiment analysis |
-| POST | `/analyze/batch` | Batch sentiment (up to 100 texts) |
-| GET/POST | `/tokenize` | Morpheme tokenization |
-| GET | `/vocab` | HuggingFace vocab JSON |
-| GET | `/roots` | Root enumeration (paginated) |
-| GET | `/root/{id}` | Root metadata |
-| GET | `/root/{id}/words` | Root's word family by language |
-| GET | `/sentiment/decode?s=0xHEX` | Decode sentiment bitmask |
+| GET/POST | `/analyze?text=...` | Sentiment analysis |
+| POST | `/analyze/batch` | Batch sentiment (up to 100) |
+| GET/POST | `/emotion?text=...` | Plutchik emotion decomposition |
+| GET/POST | `/drift?text=...` | Sentiment trajectory + pattern |
+| GET | `/crosslingual?word=X` | Cross-lingual consensus |
+| GET/POST | `/tokenize?text=...` | Morpheme tokenization |
+| GET | `/sentiment/decode?s=0xHEX` | Decode bitmask |
+| GET | `/vocab` | HuggingFace vocab export |
+| GET | `/roots?limit=N&offset=N` | Root enumeration (paginated) |
+| GET | `/root/{id}[/words]` | Root metadata / word family |
 
 ---
 
-## Real Use Cases
+## Real-World Use Cases
 
-### Content moderation (cross-lingual, no regex)
+### Cross-lingual content moderation (no regex)
 
 ```go
-// Works for EN, PT, ES, FR, IT simultaneously — same root_id regardless of language
 wr := lex.LookupWord(word)
 if wr != nil && morpheme.RootOf(wr.WordID) >= 82 && morpheme.RootOf(wr.WordID) <= 85 {
-    blockContent() // vulgar root family — universal filter
+    blockContent() // vulgar root family — covers ALL 24 languages at once
 }
 ```
-
-No per-language regex lists. No translation step. One check covers all languages.
 
 ### Multilingual sentiment analysis
 
 ```go
-// "terrible service" (EN), "serviço terrível" (PT), "servicio terrible" (ES)
-// → all return root_id=10 (terr), same sentiment: NEGATIVE STRONG
 for _, review := range customerReviews {
     result := analyze.Analyze(lex, review.Text)
+    // Works identically for "terrible" (EN), "terrível" (PT), "terrible" (ES)
     db.Save(Review{Score: result.TotalScore, Lang: review.Lang})
 }
 ```
 
-### LLM training data preparation
+### LLM training data
 
 ```bash
-# Export word→word_id map (HuggingFace tokenizer format)
-curl localhost:8080/vocab > umcs_vocab.json
-
-# Generate Token64 values for training corpus
-lexsent tokenize "the product quality was not terrible" --format token64
-# → 0x0002800013014020 0x... 0x... (one uint64 per token, fully self-describing)
+curl localhost:8080/vocab > umcs_vocab.json    # HuggingFace format
+# Cognates share root_id → model learns shared representations for free
 ```
 
-Cognates across languages share the same root_id — the model learns shared representations for free without any alignment step.
-
-### Etymology research
+### Customer support escalation detection
 
 ```bash
-# Trace "philosophy" back to Proto-Indo-European
-curl "localhost:8080/etymo?word=philosophy"
-# → phil (Greek, "love") → PIE root *bʰiléh₂
-
-# Find all words sharing the "phil" root across languages
-curl "localhost:8080/cognates?word=philosophy"
-# → filosofia (PT/ES/IT), philosophie (FR/DE), philosopher (EN), ...
+curl -X POST localhost:8080/drift \
+  -d "Thank you for your patience. This is unacceptable. I want a refund now."
+# → { "pattern": "DESCENDING", "volatility": 0.8 }
+# Trigger escalation when pattern = DESCENDING + high volatility
 ```
 
-### Readability scoring (using AoA tiers)
+### Readability scoring (AoA tiers)
 
 ```go
-tokens := lex.Tokenize(text)
-early := 0
+tokens := tokenizer.Tokenize(lex, text)
+earlyAcq := 0
 for _, t := range tokens {
-    if sentiment.AOA(t.Sentiment) == sentiment.AOAEarly {
-        early++
-    }
+    if sentiment.AOA(t.Sentiment) == sentiment.AOAEarly { earlyAcq++ }
 }
-readability := float64(early) / float64(len(tokens))
-// > 0.8 → child-accessible text; < 0.3 → academic/technical text
+// > 80% EARLY → child-accessible; < 30% → academic/technical
+```
+
+### Phonetic analysis
+
+```go
+wr := lex.LookupWord("terrível")
+syllables := phon.Syllables(wr.Flags)    // 3
+stress := phon.StressPattern(wr.Flags)   // penultimate
+ipa := lex.Pronunciation(wr)             // /te.ˈʁi.vew/
+```
+
+### C / Python / Ruby integration
+
+```bash
+go build -buildmode=c-shared -o libumcs.so ./pkg/capi
+```
+
+```c
+#include "libumcs.h"
+umcs_load("lexicon.umcs");
+UmcsAnalysisResult r;
+umcs_analyze("terrible service", &r);
+printf("score: %f, verdict: %s\n", r.score, r.verdict);
 ```
 
 ---
@@ -362,99 +608,94 @@ bits 11..0  = variant  (12 bits → up to 4,095 variants per root)
 
 word_id = (root_id << 12) | variant
 
-Examples:
-  root "negat" → root_id=1
+root "negat" → root_id=1
   "negative"  (EN, v1) → word_id = (1<<12)|1 = 4097
   "negativo"  (PT, v2) → word_id = (1<<12)|2 = 4098
   "negación"  (ES, v4) → word_id = (1<<12)|4 = 4100
 
-  Morpheme.RootOf(4098) == Morpheme.RootOf(4097) → true (same family)
+morpheme.RootOf(4098) == morpheme.RootOf(4097) → true (same family)
 ```
 
 ### .umcs binary format
 
 ```
-Offset  Size  Field
-0       64    Header (magic=0x4C534442, version, counts, offsets, checksum)
-64      N×32  Root table (sorted by root_id)
-H       M×32  Word table (sorted by word_id)
-W       var   String heap (null-terminated UTF-8)
+Offset  Size     Field
+0       64       Header (magic=0x4C534442, version, counts, offsets, FNV-1a checksum)
+64      N×44     Root table (sorted by root_id)
+H       M×36     Word table (sorted by word_id)
+W       variable String heap (null-terminated UTF-8)
 ```
 
-All integers are little-endian uint32. The checksum (FNV-1a) covers all data after the header.
+All integers: little-endian uint32. Backward-compatible v1→v2.
 
 ---
 
-## The `pkg/infer` package — morphological inference
+## Morphological Inference
 
-Words that share morphological patterns share semantic properties. The `infer` package auto-fills missing annotation fields from suffix patterns:
+The `pkg/infer` package auto-fills missing annotations from suffix/prefix patterns:
 
 ```
-"-ção" / "-tion" / "-keit" / "-té"  → NOUN + ABSTRACT
-"-mente" / "-ly" / "-ment"          → ADV
-"-oso" / "-ful" / "-lich"           → ADJ
-"-ar" / "-er" / "-are"              → VERB
+"-ção" / "-tion" / "-keit" / "-té"    → NOUN + ABSTRACT
+"-mente" / "-ly" / "-ment"            → ADV
+"-oso" / "-ful" / "-lich"             → ADJ
+"-ar" / "-er" / "-are"                → VERB
+"ex-"                                 → STRONG intensity
+"sub-"                                → WEAK intensity
+"ir-" / "un-" / "in-"                → NEGATION marker
 ```
 
-Applied during `lexsent build`, `infer.FillMissing()` fills in dimensions that the annotator left blank without overwriting explicit annotations. This is how UMCS scales: annotate a few hundred words manually, let morphological rules infer dimensions for thousands more.
+Applied during `lexsent build` via `infer.FillMissing()` — fills empty fields without overwriting explicit annotations. Annotate hundreds manually, infer thousands from patterns.
 
 ---
 
-## Expanding the lexicon
-
-### CSV format
-
-**roots.csv**:
-```
-root_id,root_str,origin,meaning_en,notes,parent_root_id
-10,terr,LATIN,fear or dread,from terror,0
-32,terrib,LATIN,terrible or causing terror,derived from terrere,10
-```
-
-**words.csv** (new extended format):
-```
-word_id,root_id,variant,word,lang,norm,polarity,intensity,semantic_role,domain,
-freq_rank,flags,pos,arousal,dominance,aoa,concreteness,register,ontological,polysemy
-40961,10,1,terrible,EN,terrible,NEGATIVE,STRONG,EVALUATION,GENERAL,
-800,0,ADJ,HIGH,LOW,MID,CONCRETE,NEUTRAL,PROPERTY,2
-```
-
-New columns (all optional — existing rows default to 0/NONE):
-- `pos`: NOUN/VERB/ADJ/ADV/PARTICLE/PREP/CONJ
-- `arousal`: NONE/LOW/MED/HIGH
-- `dominance`: NONE/LOW/MED/HIGH
-- `aoa`: EARLY/MID/LATE/TECHNICAL
-- `concreteness`: CONCRETE or empty (abstract)
-- `register`: NEUTRAL/FORMAL/INFORMAL/SLANG/VULGAR/ARCHAIC/POETIC/TECHNICAL/SCIENTIFIC/CHILD/REGIONAL
-- `ontological`: NONE/PERSON/PLACE/ARTIFACT/NATURAL/EVENT/STATE/PROPERTY/QUANTITY/RELATION/TEMPORAL/BIOLOGICAL/SOCIAL/ABSTRACT
-- `polysemy`: integer count of distinct senses
-
-### Automated discovery
+## Tests
 
 ```bash
-# Discover new words from Wiktionary (live API)
-./lexsent discover --lang PT,EN,ES --depth 2 --limit 500
-
-# Import from Wiktionary XML dump (offline)
-./lexsent import --dump dumps/enwiktionary.xml.bz2 --lang EN --limit 10000
+go test ./... -race          # 18 packages, all passing
+go test ./pkg/classify -bench .  # Benchmarks vs VADER/DistilBERT/RoBERTa
 ```
+
+Test types:
+- **Unit tests** — all packages
+- **Stress tests** — large text analysis, tokenization throughput
+- **Property-based tests** — classifier invariants
+- **Race condition tests** — concurrency safety
+- **Benchmark comparisons** — vs VADER, DistilBERT, RoBERTa
+
+---
+
+## Lexicon Stats
+
+| Metric | Value |
+|--------|-------|
+| Root families | 365 |
+| Annotated words | 2,442 |
+| Imported words | 656K+ |
+| Languages (core) | 24 |
+| Languages (via datasets) | 50+ |
+| Theoretical capacity | ~1M roots × 4K variants = **4B word_ids** |
+| Binary size | ~200 KB |
+| Semantic dimensions | 11 per word |
+| API endpoints | 16 |
+| CLI commands | 16 |
+| Feature dimensions (classifier) | 48 |
+| External datasets integrated | 20+ |
 
 ---
 
 ## Roadmap
 
-- [ ] **Token128**: extend to 128-bit for lossless encoding of all dimensions including domain
-- [ ] **Genetic algorithm**: GA-based optimization of sentiment analysis parameters (negation window size, intensifier multiplier) against labeled corpora
-- [ ] **Semi-supervised propagation**: extend `pkg/propagate` with ML-weighted confidence scores
-- [ ] **Morphological parser**: decompose "impossível" → im-(negation) + poss(root) + -ível(suffix)
-- [ ] **Cross-lingual bridge**: `/translate?word=terrible&from=EN&to=PT` via root_id lookup
-- [ ] **Readability API**: `/readability?text=...` using AoA tiers
-- [ ] **Valency annotation**: syntactic argument structure for verbs (TRANSITIVE/INTRANSITIVE/DITRANSITIVE)
-- [ ] **Gender annotation**: grammatical gender per word (MASC/FEM/NEUTER/COMMON)
-- [ ] **Embedding export**: export root_id-indexed embeddings compatible with SentenceTransformers
-- [ ] **More languages**: completing annotation for TG/HI/BN/ID/TR/FA/SW/UK/PL/SA/TA/HE
-- [ ] **Ontology depth**: multi-level ontological hierarchy (BIOLOGICAL > ANIMAL > MAMMAL > PRIMATE)
-- [ ] **False friends database**: cross-lingual false cognate detection via FalseFriend flag
+- [ ] **Token128** — extend to 128-bit for lossless encoding including domain flags
+- [ ] **ML-weighted propagation** — confidence-scored cross-lingual sentiment transfer
+- [ ] **Morphological parser** — decompose `impossível` → `im-` (negation) + `poss` (root) + `-ível` (suffix)
+- [ ] **Translation bridge** — `/translate?word=terrible&from=EN&to=PT` via root_id
+- [ ] **Readability API** — `/readability?text=...` using AoA tiers
+- [ ] **Valency annotation** — syntactic argument structure (TRANSITIVE/INTRANSITIVE/DITRANSITIVE)
+- [ ] **Gender annotation** — grammatical gender per word (MASC/FEM/NEUTER/COMMON)
+- [ ] **Embedding export** — root_id-indexed embeddings (SentenceTransformers compatible)
+- [ ] **Ontology depth** — multi-level hierarchy (BIOLOGICAL > ANIMAL > MAMMAL)
+- [ ] **False friends database** — cross-lingual divergence tracking via FalseFriend flag
+- [ ] **WebAssembly build** — run UMCS in the browser
 
 ---
 

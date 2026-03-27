@@ -13,11 +13,9 @@ import (
 
 func main() {
 	base := filepath.Dir(filepath.Dir(os.Args[0]))
-	// Allow override via env or fallback to working directory layout
 	if env := os.Getenv("UMCS_ROOT"); env != "" {
 		base = env
 	} else {
-		// Detect project root by looking for data/ relative to cwd
 		wd, err := os.Getwd()
 		if err == nil {
 			if _, serr := os.Stat(filepath.Join(wd, "data", "imported_words.csv")); serr == nil {
@@ -30,7 +28,6 @@ func main() {
 	extDir := filepath.Join(dataDir, "external")
 	csvPath := filepath.Join(dataDir, "imported_words.csv")
 
-	// 1. Read existing CSV to find max word_id
 	nextID, err := findNextWordID(csvPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error reading existing CSV: %v\n", err)
@@ -40,72 +37,121 @@ func main() {
 
 	var allEntries []ingest.Entry
 
-	// 2. Import OpLexicon v3.0 (PT)
-	{
-		path := filepath.Join(extDir, "OpLexicon_v3.0.txt")
-		entries, res, err := ingest.ImportOpLexicon(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "OpLexicon: %v\n", err)
-		} else {
-			fmt.Printf("OpLexicon:   %d entries (polarity: %v)\n", res.Total, res.ByPolarity)
-			allEntries = append(allEntries, entries...)
-		}
+	// ═══ Phase 1: Sentiment-bearing datasets ═══════════════════════════════
+
+	// OpLexicon v3.0 (PT)
+	importDataset(&allEntries, "OpLexicon", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportOpLexicon(filepath.Join(extDir, "OpLexicon_v3.0.txt"))
+	})
+
+	// SentiLex-PT02 (PT)
+	importDataset(&allEntries, "SentiLex", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportSentiLex(filepath.Join(extDir, "SentiLex-PT02.txt"))
+	})
+
+	// MPQA (EN)
+	importDataset(&allEntries, "MPQA", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportMPQA(filepath.Join(extDir, "mpqa-subj.tff"))
+	})
+
+	// ML-Senticon (EN, ES, CA, EU, GL)
+	senticonLangs := map[string]string{
+		"en": "EN", "es": "ES", "ca": "CA", "eu": "EU", "gl": "GL",
+	}
+	for code, lang := range senticonLangs {
+		name := fmt.Sprintf("ML-Senticon-%s", strings.ToUpper(code))
+		path := filepath.Join(extDir, "ML-Senticon", fmt.Sprintf("senticon.%s.xml", code))
+		importDataset(&allEntries, name, func() ([]ingest.Entry, ingest.Result, error) {
+			return ingest.ImportMLSenticon(path, lang)
+		})
 	}
 
-	// 3. Import SentiLex-PT02 (PT)
-	{
-		path := filepath.Join(extDir, "SentiLex-PT02.txt")
-		entries, res, err := ingest.ImportSentiLex(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "SentiLex: %v\n", err)
-		} else {
-			fmt.Printf("SentiLex:    %d entries (polarity: %v)\n", res.Total, res.ByPolarity)
-			allEntries = append(allEntries, entries...)
-		}
+	// SO-CAL English
+	importDataset(&allEntries, "SO-CAL-EN", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportSOCAL(filepath.Join(extDir, "SO-CAL", "Resources", "dictionaries", "English"), "EN")
+	})
+
+	// SO-CAL Spanish
+	importDataset(&allEntries, "SO-CAL-ES", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportSOCAL(filepath.Join(extDir, "SO-CAL", "Resources", "dictionaries", "Spanish"), "ES")
+	})
+
+	// ═══ Phase 2: Morphological / phonological datasets ════════════════════
+
+	// Lexique383 (FR)
+	importDataset(&allEntries, "Lexique383", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportLexique383(filepath.Join(extDir, "Lexique383.tsv"))
+	})
+
+	// UniMorph (5 languages)
+	umLangs := map[string]string{
+		"en": "EN", "pt": "PT", "es": "ES", "de": "DE", "fr": "FR",
+	}
+	for code, lang := range umLangs {
+		name := fmt.Sprintf("UniMorph-%s", strings.ToUpper(code))
+		path := filepath.Join(extDir, fmt.Sprintf("unimorph-%s.tsv", code))
+		importDataset(&allEntries, name, func() ([]ingest.Entry, ingest.Result, error) {
+			return ingest.ImportUniMorph(path, lang)
+		})
 	}
 
-	// 4. Import Lexique383 (FR)
-	{
-		path := filepath.Join(extDir, "Lexique383.tsv")
-		entries, res, err := ingest.ImportLexique383(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Lexique383: %v\n", err)
-		} else {
-			fmt.Printf("Lexique383:  %d entries (polarity: %v)\n", res.Total, res.ByPolarity)
-			allEntries = append(allEntries, entries...)
-		}
-	}
+	// MorphoLex (EN)
+	importDataset(&allEntries, "MorphoLex", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportMorphoLex(filepath.Join(extDir, "morpholex-en.tsv"))
+	})
 
-	// 5. Import MPQA (EN)
-	{
-		path := filepath.Join(extDir, "mpqa-subj.tff")
-		entries, res, err := ingest.ImportMPQA(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "MPQA: %v\n", err)
-		} else {
-			fmt.Printf("MPQA:        %d entries (polarity: %v)\n", res.Total, res.ByPolarity)
-			allEntries = append(allEntries, entries...)
-		}
-	}
+	// Brysbaert Concreteness (EN)
+	importDataset(&allEntries, "Brysbaert", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportBrysbaertConcreteness(filepath.Join(extDir, "brysbaert-concreteness.tsv"))
+	})
 
-	fmt.Printf("\nTotal raw entries: %d\n", len(allEntries))
+	// ═══ Phase 3: Cross-lingual / etymological datasets ════════════════════
 
-	// 6. Enrich with IPA from IPA-dict files
+	// CogNet v2.0 (338 languages)
+	importDataset(&allEntries, "CogNet-v2", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportCogNet(filepath.Join(extDir, "CogNet", "CogNet-v2.0.tsv"))
+	})
+
+	// EtymWn (etymological word network)
+	importDataset(&allEntries, "EtymWn", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportEtymWn(filepath.Join(extDir, "etymwn", "etymwn.tsv"))
+	})
+
+	fmt.Printf("\n═══════════════════════════════════════════════════\n")
+	fmt.Printf("Total raw entries: %d\n", len(allEntries))
+
+	// ═══ Enrichment: IPA from IPA-dict + CMUDict ═══════════════════════════
+
 	ipaLangs := map[string]string{
-		"PT": "pt",
-		"FR": "fr",
-		"EN": "en",
+		"PT": "pt", "FR": "fr", "EN": "en", "ES": "es", "DE": "de",
+		"AR": "ar", "JA": "ja", "KO": "ko", "ZH": "zh",
 	}
 	ipaMaps := make(map[string]map[string]string)
 	for lang, code := range ipaLangs {
 		ipaPath := filepath.Join(extDir, fmt.Sprintf("IPA-dict-%s.txt", code))
 		m, err := ingest.ImportIPADict(ipaPath, lang)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "IPA-dict-%s: %v\n", code, err)
 			continue
 		}
 		ipaMaps[lang] = m
 		fmt.Printf("IPA-dict-%s:  %d pronunciations loaded\n", code, len(m))
+	}
+
+	// Also load CMUDict IPA
+	cmuPath := filepath.Join(extDir, "cmudict-ipa.txt")
+	cmuIPA, err := ingest.ImportCMUDictIPA(cmuPath)
+	if err == nil && len(cmuIPA) > 0 {
+		fmt.Printf("CMUDict-IPA: %d pronunciations loaded\n", len(cmuIPA))
+		// Merge into EN IPA map (CMUDict as fallback)
+		if ipaMaps["EN"] == nil {
+			ipaMaps["EN"] = cmuIPA
+		} else {
+			for k, v := range cmuIPA {
+				if _, exists := ipaMaps["EN"][k]; !exists {
+					ipaMaps["EN"][k] = v
+				}
+			}
+		}
 	}
 
 	enriched := 0
@@ -124,11 +170,11 @@ func main() {
 	}
 	fmt.Printf("IPA enriched: %d entries\n", enriched)
 
-	// 7. Merge duplicates
+	// ═══ Merge, dedup, exclude ═════════════════════════════════════════════
+
 	merged := ingest.Merge(allEntries)
 	fmt.Printf("After merge:  %d unique entries\n", len(merged))
 
-	// 8. Exclude existing
 	filtered, skipped, err := ingest.ExcludeExisting(merged, csvPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ExcludeExisting: %v\n", err)
@@ -142,38 +188,58 @@ func main() {
 		return
 	}
 
-	// 9. Append to CSV
+	// ═══ Write to CSV ═════════════════════════════════════════════════════
+
 	if err := ingest.WriteCSV(csvPath, filtered, nextID, 0); err != nil {
 		fmt.Fprintf(os.Stderr, "WriteCSV: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 10. Summary
+	// ═══ Summary ══════════════════════════════════════════════════════════
+
 	polarityCounts := make(map[string]int)
 	langCounts := make(map[string]int)
+	sourceCounts := make(map[string]int)
 	for _, e := range filtered {
 		polarityCounts[e.Polarity]++
 		langCounts[e.Lang]++
+		sourceCounts[e.Source]++
 	}
 
-	fmt.Printf("\n=== Import Summary ===\n")
+	fmt.Printf("\n══════════════════════════════════════════════════════════\n")
+	fmt.Printf("  IMPORT SUMMARY\n")
+	fmt.Printf("══════════════════════════════════════════════════════════\n")
 	fmt.Printf("Appended %d new entries (word_id %d..%d)\n", len(filtered), nextID, nextID+len(filtered)-1)
-	fmt.Printf("By language:\n")
+	fmt.Printf("\nBy language:\n")
 	for lang, count := range langCounts {
 		fmt.Printf("  %s: %d\n", lang, count)
 	}
-	fmt.Printf("By polarity:\n")
+	fmt.Printf("\nBy source:\n")
+	for src, count := range sourceCounts {
+		fmt.Printf("  %s: %d\n", src, count)
+	}
+	fmt.Printf("\nBy polarity:\n")
 	for pol, count := range polarityCounts {
 		fmt.Printf("  %s: %d\n", pol, count)
 	}
+	fmt.Printf("══════════════════════════════════════════════════════════\n")
 }
 
-// findNextWordID reads the CSV and returns max(word_id) + 1.
+func importDataset(all *[]ingest.Entry, name string, fn func() ([]ingest.Entry, ingest.Result, error)) {
+	entries, res, err := fn()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%-16s SKIP: %v\n", name+":", err)
+		return
+	}
+	fmt.Printf("%-16s %d entries (polarity: %v)\n", name+":", res.Total, res.ByPolarity)
+	*all = append(*all, entries...)
+}
+
 func findNextWordID(path string) (int, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return 100000, nil // default starting ID
+			return 100000, nil
 		}
 		return 0, err
 	}
@@ -181,7 +247,7 @@ func findNextWordID(path string) (int, error) {
 
 	r := csv.NewReader(f)
 	r.LazyQuotes = true
-	r.FieldsPerRecord = -1 // variable fields
+	r.FieldsPerRecord = -1
 
 	header, err := r.Read()
 	if err != nil {
