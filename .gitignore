@@ -1,4 +1,5 @@
 /lexsent
+/import-new
 *.umcs
 dumps/
 data/.discover_checkpoint.json
