@@ -15,6 +15,7 @@ import (
 	"github.com/kak/umcs/pkg/analyze"
 	"github.com/kak/umcs/pkg/lexdb"
 	"github.com/kak/umcs/pkg/morpheme"
+	"github.com/kak/umcs/pkg/phon"
 	"github.com/kak/umcs/pkg/sentiment"
 	"github.com/kak/umcs/pkg/tokenizer"
 )
@@ -48,6 +49,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/emotion", s.handleEmotion)
 	mux.HandleFunc("/drift", s.handleDrift)
 	mux.HandleFunc("/crosslingual", s.handleCrossLingual)
+	mux.HandleFunc("/search", s.handleSearch)
+	mux.HandleFunc("/phonology", s.handlePhonology)
+	mux.HandleFunc("/embeddings", s.handleEmbeddings)
+	mux.HandleFunc("/ground", s.handleGround)
 	return mux
 }
 
@@ -696,6 +701,272 @@ func (s *Server) handleCrossLingual(w http.ResponseWriter, r *http.Request) {
 		"confidence": confidence,
 		"languages":  nLangs,
 	})
+}
+
+// handleSearch performs prefix search across the lexicon.
+// GET /search?q=terr&limit=20&lang=EN
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		httpErr(w, "missing ?q=", 400)
+		return
+	}
+	limit := 20
+	if ls := r.URL.Query().Get("limit"); ls != "" {
+		if v, err := strconv.Atoi(ls); err == nil && v > 0 && v <= 200 {
+			limit = v
+		}
+	}
+	lang := strings.ToUpper(r.URL.Query().Get("lang"))
+
+	results := s.lex.PrefixSearch(q, limit*2) // over-collect to filter by lang
+	list := make([]map[string]any, 0, limit)
+	for _, wr := range results {
+		if lang != "" && lexdb.LangName(wr.Lang) != lang {
+			continue
+		}
+		decoded := sentiment.Decode(wr.Sentiment)
+		entry := map[string]any{
+			"word":      s.lex.WordStr(&wr),
+			"word_id":   wr.WordID,
+			"root_id":   morpheme.RootOf(wr.WordID),
+			"lang":      lexdb.LangName(wr.Lang),
+			"polarity":  decoded["polarity"],
+			"intensity": decoded["intensity"],
+		}
+		pron := s.lex.WordPron(&wr)
+		if pron != "" {
+			entry["ipa"] = pron
+		}
+		list = append(list, entry)
+		if len(list) >= limit {
+			break
+		}
+	}
+	jsonOK(w, map[string]any{"query": q, "count": len(list), "results": list})
+}
+
+// handlePhonology returns phonological analysis for a word.
+// GET /phonology?word=terrible
+func (s *Server) handlePhonology(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	word := r.URL.Query().Get("word")
+	if word == "" {
+		httpErr(w, "missing ?word=", 400)
+		return
+	}
+	lang := r.URL.Query().Get("lang")
+	var wr *lexdb.WordRecord
+	if lang != "" {
+		wr = s.lex.LookupWordInLang(word, strings.ToUpper(lang))
+	} else {
+		wr = s.lex.LookupWord(word)
+	}
+	if wr == nil {
+		httpErr(w, fmt.Sprintf("not found: %q", word), 404)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"word":      s.lex.WordStr(wr),
+		"lang":      lexdb.LangName(wr.Lang),
+		"ipa":       s.lex.WordPron(wr),
+		"syllables": phon.Syllables(wr.Flags),
+		"stress":    phon.StressName(phon.Stress(wr.Flags)),
+		"valency":   phon.ValencyName(phon.Valency(wr.Flags)),
+	})
+}
+
+// handleEmbeddings exports root-indexed semantic vectors for LLM integration.
+// Each root maps to a fixed-size vector derived from its words' sentiment dimensions.
+// GET /embeddings?format=json&limit=1000
+//
+// Use case: LLMs can use these vectors as pre-computed semantic anchors to
+// ground their outputs. Since cognates share root_id, a single vector covers
+// all languages for a morphological family — zero-shot cross-lingual transfer.
+func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	limit := 1000
+	if ls := r.URL.Query().Get("limit"); ls != "" {
+		if v, err := strconv.Atoi(ls); err == nil && v > 0 {
+			limit = v
+		}
+	}
+
+	type embedding struct {
+		RootID     uint32    `json:"root_id"`
+		Root       string    `json:"root"`
+		Meaning    string    `json:"meaning"`
+		Vector     []float64 `json:"vector"`
+		LangCount  int       `json:"lang_count"`
+		WordCount  int       `json:"word_count"`
+	}
+
+	embeddings := make([]embedding, 0, limit)
+	for _, root := range s.lex.Roots {
+		if len(embeddings) >= limit {
+			break
+		}
+		// Skip synthetic auto-bucketed roots.
+		rootStr := s.lex.RootStr(&root)
+		if strings.HasPrefix(rootStr, "_auto_") {
+			continue
+		}
+		if root.WordCount == 0 {
+			continue
+		}
+
+		// Compute mean vector from all words in this root family.
+		// Vector: [polarity, intensity, arousal, dominance, aoa, concreteness,
+		//          pos, role, syllables]
+		var vec [9]float64
+		count := 0
+		start := int(root.FirstWordIdx)
+		end := start + int(root.WordCount)
+		if end > len(s.lex.Words) {
+			end = len(s.lex.Words)
+		}
+		langSet := make(map[uint32]bool)
+		for _, wr := range s.lex.Words[start:end] {
+			sent := wr.Sentiment
+			pol := float64(sentiment.Polarity(sent))
+			if pol == 2 { pol = -1 } // NEGATIVE → -1
+			if pol == 3 { pol = 0 }  // AMBIGUOUS → 0
+			vec[0] += pol
+			vec[1] += float64(sentiment.Intensity(sent)) / 4.0
+			vec[2] += float64(sentiment.Arousal(sent)) / 3.0
+			vec[3] += float64(sentiment.Dominance(sent)) / 3.0
+			vec[4] += float64(sentiment.AOA(sent)) / 3.0
+			if sent&(1<<28) != 0 { vec[5] += 1.0 }
+			vec[6] += float64(sentiment.POS(sent)) / 7.0
+			vec[7] += float64(sentiment.Role(sent)) / 11.0
+			vec[8] += float64(phon.Syllables(wr.Flags)) / 15.0
+			langSet[wr.Lang] = true
+			count++
+		}
+		if count > 0 {
+			for i := range vec {
+				vec[i] /= float64(count)
+			}
+		}
+
+		embeddings = append(embeddings, embedding{
+			RootID:    root.RootID,
+			Root:      rootStr,
+			Meaning:   s.lex.RootMeaning(&root),
+			Vector:    vec[:],
+			LangCount: len(langSet),
+			WordCount: count,
+		})
+	}
+
+	jsonOK(w, map[string]any{
+		"version":    "1.0",
+		"dimensions": 9,
+		"labels":     []string{"polarity", "intensity", "arousal", "dominance", "aoa", "concreteness", "pos", "role", "syllables"},
+		"count":      len(embeddings),
+		"embeddings": embeddings,
+	})
+}
+
+// handleGround validates LLM-generated text against UMCS ground truth.
+// POST /ground — body: {"text": "...", "expected_sentiment": "POSITIVE"}
+//
+// Use case: after an LLM generates text, call /ground to verify that the
+// sentiment of the generated text matches expectations. This catches
+// hallucinated sentiment ("I love this disaster!") where surface words
+// contradict the declared intent.
+func (s *Server) handleGround(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Text              string `json:"text"`
+		ExpectedSentiment string `json:"expected_sentiment"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		httpErr(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Text == "" {
+		httpErr(w, "missing text field", 400)
+		return
+	}
+
+	result := analyze.Analyze(s.lex, req.Text)
+	ep := analyze.EmotionDecompose(result, s.lex)
+	points := analyze.DetectDrift(result)
+	summary := analyze.SummarizeDrift(points)
+
+	// Compute grounding quality.
+	matches := req.ExpectedSentiment == "" || strings.EqualFold(result.Verdict, req.ExpectedSentiment)
+	confidence := 0.0
+	if result.Total > 0 {
+		confidence = float64(result.Matched) / float64(result.Total)
+	}
+
+	// Token-level breakdown for debugging LLM outputs.
+	conflicts := make([]map[string]string, 0)
+	for _, t := range result.Tokens {
+		if !t.Found {
+			continue
+		}
+		tokenPol := t.Polarity
+		if req.ExpectedSentiment != "" && !strings.EqualFold(tokenPol, req.ExpectedSentiment) && tokenPol != "NEUTRAL" {
+			conflicts = append(conflicts, map[string]string{
+				"word":     t.Surface,
+				"polarity": tokenPol,
+				"expected": req.ExpectedSentiment,
+			})
+		}
+	}
+
+	jsonOK(w, map[string]any{
+		"text":               req.Text,
+		"expected":           req.ExpectedSentiment,
+		"actual_verdict":     result.Verdict,
+		"actual_score":       result.TotalScore,
+		"matches":            matches,
+		"coverage":           confidence,
+		"dominant_emotion":   ep.Dominant,
+		"drift_pattern":      summary.Pattern,
+		"conflicts":          conflicts,
+		"conflict_count":     len(conflicts),
+		"recommendation":     groundRecommendation(matches, len(conflicts), confidence),
+	})
+}
+
+// groundRecommendation provides actionable feedback for LLM text quality.
+func groundRecommendation(matches bool, conflicts int, coverage float64) string {
+	if matches && conflicts == 0 {
+		return "PASS: text sentiment aligns with expected intent"
+	}
+	if !matches && conflicts > 3 {
+		return "FAIL: multiple conflicting sentiment tokens — rewrite recommended"
+	}
+	if !matches {
+		return "WARN: overall sentiment diverges from intent — review phrasing"
+	}
+	if coverage < 0.3 {
+		return "LOW_COVERAGE: most words not in lexicon — confidence is low"
+	}
+	return "PARTIAL: some conflicting tokens but overall sentiment matches"
 }
 
 func readBody(r *http.Request) (string, error) {
