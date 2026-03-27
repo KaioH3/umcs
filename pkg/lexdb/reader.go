@@ -453,12 +453,54 @@ func (l *Lexicon) EtymologyChain(rootID uint32) []RootRecord {
 // LangCoverage returns human-readable language names covered by a root.
 func (l *Lexicon) LangCoverage(coverage uint32) []string {
 	var langs []string
-	for i := uint32(0); i < 11; i++ {
+	for i := uint32(0); i < 32; i++ {
 		if coverage&(1<<i) != 0 {
 			langs = append(langs, LangName(i))
 		}
 	}
 	return langs
+}
+
+// PrefixSearch returns up to limit words whose normalized form starts with prefix.
+// Results are sorted alphabetically by norm.
+func (l *Lexicon) PrefixSearch(prefix string, limit int) []WordRecord {
+	if limit <= 0 {
+		limit = 20
+	}
+	norm := Normalize(prefix)
+	if norm == "" {
+		return nil
+	}
+
+	var results []WordRecord
+	seen := make(map[string]bool)
+	for key, idx := range l.wordIndex {
+		// Skip lang-specific keys (contain "_" + digit suffix).
+		if strings.Contains(key, "_") {
+			continue
+		}
+		if strings.HasPrefix(key, norm) {
+			w := l.Words[idx]
+			wordStr := l.WordStr(&w)
+			if seen[wordStr] {
+				continue
+			}
+			seen[wordStr] = true
+			results = append(results, w)
+			if len(results) >= limit*3 { // over-collect, then sort+trim
+				break
+			}
+		}
+	}
+
+	// Sort by norm alphabetically.
+	sort.Slice(results, func(i, j int) bool {
+		return l.str(results[i].NormOffset) < l.str(results[j].NormOffset)
+	})
+	if len(results) > limit {
+		results = results[:limit]
+	}
+	return results
 }
 
 // ensure encoding/binary is used (for format consistency in tests)

@@ -333,6 +333,7 @@ func countLangs(flags uint32) int {
 func cmdBuild(args []string) {
 	rootsPath := "data/roots.csv"
 	wordsPath := "data/words.csv"
+	importedPath := ""
 	outPath := defaultLexicon
 
 	for i := 0; i < len(args); i++ {
@@ -341,6 +342,8 @@ func cmdBuild(args []string) {
 			rootsPath = args[i+1]; i++
 		case "--words":
 			wordsPath = args[i+1]; i++
+		case "--imported":
+			importedPath = args[i+1]; i++
 		case "--out":
 			outPath = args[i+1]; i++
 		}
@@ -351,6 +354,45 @@ func cmdBuild(args []string) {
 	words, err := seed.LoadWords(wordsPath)
 	die(err)
 
+	if importedPath != "" {
+		fmt.Printf("Loading imported words from %s...\n", importedPath)
+		impRoots, impWords, err := seed.LoadImportedWords(importedPath)
+		die(err)
+		fmt.Printf("  Imported: %d synthetic roots, %d words\n", len(impRoots), len(impWords))
+
+		// Dedup imported against curated: curated words take priority.
+		curated := make(map[string]bool, len(words))
+		for _, w := range words {
+			key := strings.ToLower(strings.TrimSpace(w.Norm)) + "|" + w.Lang
+			curated[key] = true
+		}
+		dedupWords := make([]seed.Word, 0, len(impWords))
+		usedRoots := make(map[uint32]bool)
+		for _, w := range impWords {
+			key := strings.ToLower(strings.TrimSpace(w.Norm)) + "|" + w.Lang
+			if curated[key] {
+				continue
+			}
+			dedupWords = append(dedupWords, w)
+			usedRoots[w.RootID] = true
+		}
+		// Only include roots that have at least one word.
+		dedupRoots := make([]seed.Root, 0, len(impRoots))
+		for _, r := range impRoots {
+			if usedRoots[r.RootID] {
+				dedupRoots = append(dedupRoots, r)
+			}
+		}
+		excluded := len(impWords) - len(dedupWords)
+		if excluded > 0 {
+			fmt.Printf("  Excluded: %d duplicates already in curated words\n", excluded)
+		}
+		fmt.Printf("  Final:    %d roots, %d words\n", len(dedupRoots), len(dedupWords))
+		roots = append(roots, dedupRoots...)
+		words = append(words, dedupWords...)
+	}
+
+	fmt.Printf("Building lexicon (%d roots, %d words)...\n", len(roots), len(words))
 	stats, err := lexdb.Build(roots, words, outPath)
 	die(err)
 
@@ -359,7 +401,7 @@ func cmdBuild(args []string) {
 	fmt.Printf("  Words:  %d\n", stats.WordCount)
 	fmt.Printf("  Langs:  %s\n", stats.Langs())
 	fmt.Printf("  Heap:   %d bytes\n", stats.HeapSize)
-	fmt.Printf("  Size:   %d bytes (%.1f KB)\n", stats.FileSize, float64(stats.FileSize)/1024)
+	fmt.Printf("  Size:   %d bytes (%.1f MB)\n", stats.FileSize, float64(stats.FileSize)/1024/1024)
 }
 
 // --- lookup ---
