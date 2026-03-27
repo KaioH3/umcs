@@ -5,8 +5,9 @@
 [![Go](https://img.shields.io/badge/Go-1.24-blue?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-18_packages-brightgreen)]()
-[![Languages](https://img.shields.io/badge/languages-24+-orange)]()
-[![Words](https://img.shields.io/badge/imported_words-656K+-purple)]()
+[![Languages](https://img.shields.io/badge/languages-70-orange)]()
+[![Words](https://img.shields.io/badge/words-4.37M-purple)]()
+[![Datasets](https://img.shields.io/badge/datasets-23-yellow)](DATASETS.md)
 
 ---
 
@@ -35,12 +36,15 @@ Same root (`terr`, Latin *terror*) = same embedding slot in any model. No transl
 | Etymology chains to proto-language | yes | - | - | - | - |
 | Emotion decomposition (Plutchik) | yes | - | - | - | - |
 | Sentiment drift detection | yes | - | - | - | - |
-| Embeddable binary (<200 KB) | yes | - | - | yes | - |
+| Embeddable binary | yes | - | - | yes | - |
 | HuggingFace vocab export | yes | - | - | - | - |
 | No Python / No GPU | yes | - | - | yes | - |
 | 11 semantic dimensions per word | yes | - | partial | - | - |
 | C FFI (libumcs.so) | yes | - | - | - | - |
-| 24+ languages, 50+ via datasets | yes | - | partial | - | yes |
+| 70 languages, 23 datasets | yes | - | partial | - | yes |
+| LLM grounding endpoint | yes | - | - | - | - |
+| Root-indexed embeddings | yes | - | - | - | - |
+| Prefix search | yes | - | - | - | - |
 
 ---
 
@@ -150,6 +154,19 @@ curl "localhost:8080/sentiment/decode?s=0x60130140"
 
 # HuggingFace-compatible vocab export
 curl localhost:8080/vocab > umcs_vocab.json
+
+# Prefix search
+curl "localhost:8080/search?q=terr&limit=5&lang=EN"
+
+# Phonological analysis (IPA, syllables, stress)
+curl "localhost:8080/phonology?word=terrible"
+
+# Root-indexed embeddings for LLM integration
+curl "localhost:8080/embeddings?limit=10"
+
+# Ground LLM output against sentiment truth
+curl -X POST localhost:8080/ground \
+  -d '{"text":"this product is amazing","expected_sentiment":"POSITIVE"}'
 
 # Root enumeration with pagination
 curl "localhost:8080/roots?limit=10&offset=0&productive=true"
@@ -502,7 +519,7 @@ curl "localhost:8080/crosslingual?word=terrible"
 
 ---
 
-## API Reference (16 endpoints)
+## API Reference (20 endpoints)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -522,6 +539,30 @@ curl "localhost:8080/crosslingual?word=terrible"
 | GET | `/vocab` | HuggingFace vocab export |
 | GET | `/roots?limit=N&offset=N` | Root enumeration (paginated) |
 | GET | `/root/{id}[/words]` | Root metadata / word family |
+| GET | `/search?q=X&limit=N&lang=Y` | Prefix search across lexicon |
+| GET | `/phonology?word=X` | IPA, syllables, stress, valency |
+| GET | `/embeddings?limit=N` | Root-indexed 9D semantic vectors |
+| POST | `/ground` | LLM sentiment grounding + conflict detection |
+
+### LLM Integration Endpoints
+
+#### `/embeddings` — Semantic vectors for LLM grounding
+
+Returns root-indexed 9-dimensional vectors (polarity, intensity, arousal, dominance, AoA, concreteness, POS, role, syllables). Since cognates share root_id, one vector covers all languages.
+
+```bash
+curl "localhost:8080/embeddings?limit=5"
+```
+
+#### `/ground` — Validate LLM-generated text
+
+Checks if generated text matches expected sentiment, reports conflicting tokens, and provides actionable recommendations (PASS/WARN/FAIL).
+
+```bash
+curl -X POST localhost:8080/ground \
+  -d '{"text":"I absolutely love this terrible disaster","expected_sentiment":"POSITIVE"}'
+# → {"matches": false, "conflicts": [{"word":"terrible","polarity":"NEGATIVE"}], ...}
+```
 
 ---
 
@@ -668,18 +709,21 @@ Test types:
 
 | Metric | Value |
 |--------|-------|
-| Root families | 365 |
-| Annotated words | 2,442 |
-| Imported words | 656K+ |
-| Languages (core) | 24 |
-| Languages (via datasets) | 50+ |
+| Curated root families | 365 |
+| Curated words | 2,442 |
+| Total words (with imports) | **4,370,202** |
+| Total roots (with synthetic) | **76,622** |
+| Languages supported | **70** |
+| Entries with IPA | 933,740 |
+| External datasets | 23 |
 | Theoretical capacity | ~1M roots × 4K variants = **4B word_ids** |
-| Binary size | ~200 KB |
+| Extended binary size | ~216 MB |
 | Semantic dimensions | 11 per word |
-| API endpoints | 16 |
+| API endpoints | **20** |
 | CLI commands | 16 |
 | Feature dimensions (classifier) | 48 |
-| External datasets integrated | 20+ |
+
+See [DATASETS.md](DATASETS.md) for dataset details and [BUILDING.md](BUILDING.md) for reproduction steps.
 
 ---
 
