@@ -830,3 +830,421 @@ func TestProperty_IntensityIsValid(t *testing.T) {
 		}
 	}
 }
+
+// ── ImportOpLexicon ────────────────────────────────────────────────────────
+
+func TestImportOpLexicon_Basic(t *testing.T) {
+	data := "abafada,adj,-1,A\nabafado,adj,-1,A\nfeliz,adj,1,A\nnormal,adj,0,A\n"
+	p := writeTempFile(t, "oplexicon.txt", data)
+
+	entries, res, err := ImportOpLexicon(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 4 {
+		t.Errorf("total=%d, want 4", res.Total)
+	}
+	if entries[0].Polarity != "NEGATIVE" {
+		t.Errorf("abafada=%q", entries[0].Polarity)
+	}
+	if entries[2].Polarity != "POSITIVE" {
+		t.Errorf("feliz=%q", entries[2].Polarity)
+	}
+	if entries[3].Polarity != "NEUTRAL" {
+		t.Errorf("normal=%q", entries[3].Polarity)
+	}
+	for _, e := range entries {
+		if e.Lang != "PT" {
+			t.Errorf("lang=%q, want PT", e.Lang)
+		}
+		if e.Source != "OpLexicon" {
+			t.Errorf("source=%q", e.Source)
+		}
+	}
+}
+
+func TestImportOpLexicon_SkipsEmoticons(t *testing.T) {
+	data := "=),emot,1,A\n;D,emot,-1,A\nfeliz,adj,1,A\n"
+	p := writeTempFile(t, "oplexicon.txt", data)
+
+	entries, _, err := ImportOpLexicon(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1 (skip emoticons)", len(entries))
+	}
+}
+
+func TestImportOpLexicon_SkipsHashtags(t *testing.T) {
+	data := "#happy,htag,1,A\nfeliz,adj,1,A\n"
+	p := writeTempFile(t, "oplexicon.txt", data)
+
+	entries, _, err := ImportOpLexicon(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1 (skip hashtags)", len(entries))
+	}
+}
+
+func TestImportOpLexicon_SkipsReflexive(t *testing.T) {
+	data := "ababelar,vb,-1,A\nababelar-se,vb,1,A\n"
+	p := writeTempFile(t, "oplexicon.txt", data)
+
+	entries, _, err := ImportOpLexicon(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1 (skip reflexive)", len(entries))
+	}
+}
+
+func TestImportOpLexicon_POS(t *testing.T) {
+	data := "bonito,adj,1,A\ncorrer,vb,0,A\ncasa,n,0,A\nrapidamente,adv,0,A\n"
+	p := writeTempFile(t, "oplexicon.txt", data)
+
+	entries, _, err := ImportOpLexicon(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	posMap := make(map[string]string)
+	for _, e := range entries {
+		posMap[e.Word] = e.POS
+	}
+	if posMap["bonito"] != "ADJ" {
+		t.Errorf("bonito POS=%q", posMap["bonito"])
+	}
+	if posMap["correr"] != "VERB" {
+		t.Errorf("correr POS=%q", posMap["correr"])
+	}
+	if posMap["casa"] != "NOUN" {
+		t.Errorf("casa POS=%q", posMap["casa"])
+	}
+	if posMap["rapidamente"] != "ADV" {
+		t.Errorf("rapidamente POS=%q", posMap["rapidamente"])
+	}
+}
+
+func TestImportOpLexicon_Deduplicates(t *testing.T) {
+	data := "feliz,adj,1,A\nfeliz,adj,1,A\nFeliz,adj,1,A\n"
+	p := writeTempFile(t, "oplexicon.txt", data)
+
+	entries, _, err := ImportOpLexicon(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1 (dedup)", len(entries))
+	}
+}
+
+// ── ImportSentiLex ─────────────────────────────────────────────────────────
+
+func TestImportSentiLex_Basic(t *testing.T) {
+	data := "abafado.PoS=Adj;TG=HUM:N0;POL:N0=-1;ANOT=JALC\nfeliz.PoS=Adj;TG=HUM:N0;POL:N0=1;ANOT=MAN\nabarcante.PoS=Adj;TG=HUM:N0;POL:N0=0;ANOT=MAN\n"
+	p := writeTempFile(t, "sentilex.txt", data)
+
+	entries, res, err := ImportSentiLex(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 3 {
+		t.Errorf("total=%d, want 3", res.Total)
+	}
+	if entries[0].Polarity != "NEGATIVE" {
+		t.Errorf("abafado=%q", entries[0].Polarity)
+	}
+	if entries[1].Polarity != "POSITIVE" {
+		t.Errorf("feliz=%q", entries[1].Polarity)
+	}
+	if entries[2].Polarity != "NEUTRAL" {
+		t.Errorf("abarcante=%q", entries[2].Polarity)
+	}
+	for _, e := range entries {
+		if e.Lang != "PT" {
+			t.Errorf("lang=%q", e.Lang)
+		}
+		if e.Source != "SentiLex" {
+			t.Errorf("source=%q", e.Source)
+		}
+	}
+}
+
+func TestImportSentiLex_POS(t *testing.T) {
+	data := "abandono.PoS=N;TG=HUM:N0;POL:N0=-1;ANOT=MAN\nabandonar.PoS=V;TG=HUM:N0:N1;POL:N0=-1;POL:N1=0;ANOT=MAN\n"
+	p := writeTempFile(t, "sentilex.txt", data)
+
+	entries, _, err := ImportSentiLex(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entries[0].POS != "NOUN" {
+		t.Errorf("abandono POS=%q", entries[0].POS)
+	}
+	if entries[1].POS != "VERB" {
+		t.Errorf("abandonar POS=%q", entries[1].POS)
+	}
+}
+
+func TestImportSentiLex_SkipsComments(t *testing.T) {
+	data := "# comment\nfeliz.PoS=Adj;TG=HUM:N0;POL:N0=1;ANOT=MAN\n"
+	p := writeTempFile(t, "sentilex.txt", data)
+
+	entries, _, err := ImportSentiLex(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1", len(entries))
+	}
+}
+
+func TestImportSentiLex_InvalidFormat(t *testing.T) {
+	data := "no_pos_marker\nfeliz.PoS=Adj;TG=HUM:N0;POL:N0=1;ANOT=MAN\n"
+	p := writeTempFile(t, "sentilex.txt", data)
+
+	entries, res, err := ImportSentiLex(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1", len(entries))
+	}
+	if res.Errors != 1 {
+		t.Errorf("errors=%d, want 1", res.Errors)
+	}
+}
+
+// ── ImportLexique383 ───────────────────────────────────────────────────────
+
+func TestImportLexique383_Basic(t *testing.T) {
+	header := "ortho\tphon\tlemme\tcgram\tgenre\tnombre\tfreqlemfilms2\tfreqlemlivres\tfreqfilms2\tfreqlivres\tinfover\tnbhomogr\tnbhomoph\tislem\tnblettres\tnbphons\tcvcv\tp_cvcv\tvoisorth\tvoisphon\tpuorth\tpuphon\tsyll\tnbsyll\tcv-cv\torthrenv\tphonrenv\torthosyll\tcgramortho\tdeflem\tdefobs\told20\tpld20\tmorphoder\tnbmorph\n"
+	row := "bonjour\tbOZuR\tbonjour\tNOM\tm\t\t54.83\t25.27\t54.83\t25.27\t\t1\t1\t1\t7\t5\tCVCCVC\tCVCVC\t0\t0\t4\t3\tbO-ZuR\t2\tCVC-CVC\truojnob\tRuZOb\tbon-jour\tNOM\t\t\t3.25\t3.05\tbonjour\t1\n"
+	data := header + row
+	p := writeTempFile(t, "lexique.tsv", data)
+
+	entries, res, err := ImportLexique383(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 1 {
+		t.Errorf("total=%d, want 1", res.Total)
+	}
+	if entries[0].Word != "bonjour" {
+		t.Errorf("word=%q", entries[0].Word)
+	}
+	if entries[0].Lang != "FR" {
+		t.Errorf("lang=%q", entries[0].Lang)
+	}
+	if entries[0].IPA != "bOZuR" {
+		t.Errorf("IPA=%q", entries[0].IPA)
+	}
+	if entries[0].Syllables != 2 {
+		t.Errorf("syllables=%d, want 2", entries[0].Syllables)
+	}
+	if entries[0].POS != "NOUN" {
+		t.Errorf("POS=%q", entries[0].POS)
+	}
+	if entries[0].Source != "Lexique383" {
+		t.Errorf("source=%q", entries[0].Source)
+	}
+}
+
+func TestImportLexique383_SkipsMultiWord(t *testing.T) {
+	header := "ortho\tphon\tlemme\tcgram\tgenre\tnombre\tfreqlemfilms2\tfreqlemlivres\tfreqfilms2\tfreqlivres\tinfover\tnbhomogr\tnbhomoph\tislem\tnblettres\tnbphons\tcvcv\tp_cvcv\tvoisorth\tvoisphon\tpuorth\tpuphon\tsyll\tnbsyll\tcv-cv\torthrenv\tphonrenv\torthosyll\tcgramortho\tdeflem\tdefobs\told20\tpld20\tmorphoder\tnbmorph\n"
+	row := "a capella\takapEla\ta capella\tADV\t\t\t0.04\t0.07\t0.04\t0.07\t\t1\t2\t1\t9\t7\tV CVCVCCV\tVCVCVCV\t0\t0\t6\t5\ta-ka-pE-la\t4\tV-CV-CV-CV\tallepac a\talEpaka\ta ca-pel-la\tADV\t\t\t3.85\t2.85\ta-capella\t2\n"
+	data := header + row
+	p := writeTempFile(t, "lexique.tsv", data)
+
+	entries, _, err := ImportLexique383(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("entries=%d, want 0 (skip multi-word)", len(entries))
+	}
+}
+
+func TestImportLexique383_FreqRank(t *testing.T) {
+	header := "ortho\tphon\tlemme\tcgram\tgenre\tnombre\tfreqlemfilms2\tfreqlemlivres\tfreqfilms2\tfreqlivres\tinfover\tnbhomogr\tnbhomoph\tislem\tnblettres\tnbphons\tcvcv\tp_cvcv\tvoisorth\tvoisphon\tpuorth\tpuphon\tsyll\tnbsyll\tcv-cv\torthrenv\tphonrenv\torthosyll\tcgramortho\tdeflem\tdefobs\told20\tpld20\tmorphoder\tnbmorph\n"
+	// High frequency word
+	row := "le\tl@\tle\tART\tm\ts\t50000.0\t40000.0\t50000.0\t40000.0\t\t2\t5\t1\t2\t2\tCV\tCV\t10\t5\t1\t1\tl@\t1\tCV\tel\t@l\tle\tART\t\t\t1\t1\tle\t1\n"
+	data := header + row
+	p := writeTempFile(t, "lexique.tsv", data)
+
+	entries, _, err := ImportLexique383(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("entries=%d", len(entries))
+	}
+	if entries[0].FreqRank < 1 {
+		t.Errorf("FreqRank=%d, want > 0 for high-freq word", entries[0].FreqRank)
+	}
+}
+
+func TestImportLexique383_Deduplicates(t *testing.T) {
+	header := "ortho\tphon\tlemme\tcgram\tgenre\tnombre\tfreqlemfilms2\tfreqlemlivres\tfreqfilms2\tfreqlivres\tinfover\tnbhomogr\tnbhomoph\tislem\tnblettres\tnbphons\tcvcv\tp_cvcv\tvoisorth\tvoisphon\tpuorth\tpuphon\tsyll\tnbsyll\tcv-cv\torthrenv\tphonrenv\torthosyll\tcgramortho\tdeflem\tdefobs\told20\tpld20\tmorphoder\tnbmorph\n"
+	row1 := "a\ta\ta\tNOM\tm\t\t81.36\t58.65\t81.36\t58.65\t\t3\t9\t1\t1\t1\tV\tV\t25\t20\t1\t1\ta\t1\tV\ta\ta\ta\tNOM,AUX,VER\t\t\t1\t1\ta\t1\n"
+	row2 := "a\ta\tavoir\tAUX\t\t\t18559.22\t12800.81\t6350.91\t2926.69\tind:pre:3s;\t3\t9\t0\t1\t1\tV\tV\t25\t20\t1\t1\ta\t1\tV\ta\ta\ta\tNOM,AUX,VER\t\t\t1\t1\tavoir\t1\n"
+	data := header + row1 + row2
+	p := writeTempFile(t, "lexique.tsv", data)
+
+	entries, _, err := ImportLexique383(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1 (dedup same ortho)", len(entries))
+	}
+}
+
+// ── ImportMPQA ─────────────────────────────────────────────────────────────
+
+func TestImportMPQA_Basic(t *testing.T) {
+	data := `{"happy": 1, "sad": -1, "table": 0}`
+	p := writeTempFile(t, "mpqa.json", data)
+
+	entries, res, err := ImportMPQA(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 3 {
+		t.Errorf("total=%d, want 3", res.Total)
+	}
+
+	polMap := make(map[string]string)
+	for _, e := range entries {
+		polMap[e.Word] = e.Polarity
+	}
+	if polMap["happy"] != "POSITIVE" {
+		t.Errorf("happy=%q", polMap["happy"])
+	}
+	if polMap["sad"] != "NEGATIVE" {
+		t.Errorf("sad=%q", polMap["sad"])
+	}
+	if polMap["table"] != "NEUTRAL" {
+		t.Errorf("table=%q", polMap["table"])
+	}
+}
+
+func TestImportMPQA_SkipsNonAlpha(t *testing.T) {
+	data := `{"123": 1, "happy": 1}`
+	p := writeTempFile(t, "mpqa.json", data)
+
+	entries, _, err := ImportMPQA(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("entries=%d, want 1", len(entries))
+	}
+}
+
+func TestImportMPQA_InvalidJSON(t *testing.T) {
+	data := `not json`
+	p := writeTempFile(t, "mpqa.json", data)
+
+	_, _, err := ImportMPQA(p)
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestImportMPQA_EmptyObject(t *testing.T) {
+	data := `{}`
+	p := writeTempFile(t, "mpqa.json", data)
+
+	entries, res, err := ImportMPQA(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 || res.Total != 0 {
+		t.Error("expected empty for empty object")
+	}
+}
+
+func TestImportMPQA_Source(t *testing.T) {
+	data := `{"word": 1}`
+	p := writeTempFile(t, "mpqa.json", data)
+
+	entries, _, err := ImportMPQA(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entries[0].Source != "MPQA" {
+		t.Errorf("source=%q", entries[0].Source)
+	}
+	if entries[0].Lang != "EN" {
+		t.Errorf("lang=%q", entries[0].Lang)
+	}
+}
+
+// ── ImportEmpath ───────────────────────────────────────────────────────────
+
+func TestImportEmpath_Basic(t *testing.T) {
+	data := "help\tchore\tresponsible\thelp\n" +
+		"money\tbank\tdollar\tincome\n"
+	p := writeTempFile(t, "empath.tsv", data)
+
+	cats, err := ImportEmpath(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 2 {
+		t.Errorf("categories=%d, want 2", len(cats))
+	}
+	if len(cats["help"]) != 3 {
+		t.Errorf("help words=%d, want 3", len(cats["help"]))
+	}
+	if len(cats["money"]) != 3 {
+		t.Errorf("money words=%d, want 3", len(cats["money"]))
+	}
+}
+
+func TestImportEmpath_SkipsEmpty(t *testing.T) {
+	data := "\n\nhelp\tchore\n"
+	p := writeTempFile(t, "empath.tsv", data)
+
+	cats, err := ImportEmpath(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 1 {
+		t.Errorf("categories=%d, want 1", len(cats))
+	}
+}
+
+func TestImportEmpath_MissingFile(t *testing.T) {
+	_, err := ImportEmpath("/nonexistent")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+// ── splitJSONPairs ─────────────────────────────────────────────────────────
+
+func TestSplitJSONPairs_Basic(t *testing.T) {
+	pairs := splitJSONPairs(`"a": 1, "b": 2, "c": 3`)
+	if len(pairs) != 3 {
+		t.Errorf("pairs=%d, want 3", len(pairs))
+	}
+}
+
+func TestSplitJSONPairs_CommaInString(t *testing.T) {
+	pairs := splitJSONPairs(`"a,b": 1, "c": 2`)
+	if len(pairs) != 2 {
+		t.Errorf("pairs=%d, want 2", len(pairs))
+	}
+}
+
+func TestSplitJSONPairs_Empty(t *testing.T) {
+	pairs := splitJSONPairs("")
+	if len(pairs) != 0 {
+		t.Errorf("unexpected result for empty: %v", pairs)
+	}
+}

@@ -11,6 +11,12 @@
 //   - Warriner VAD norms (13.9k words, VAD means + SDs)
 //   - IPA-dict (multiple languages, word → IPA pronunciation)
 //   - SentiWordNet 3.0 (117k synsets with PosScore/NegScore)
+//   - OpLexicon v3.0 (32k PT-BR words, POS + polarity [-1,0,1])
+//   - SentiLex-PT02 (7k PT lemmas, fine-grained polarity + POS)
+//   - Lexique383 (143k French words, frequency + phonology + POS)
+//   - MPQA Subjectivity Lexicon (6.9k EN words, polarity [-1,0,1])
+//   - Empath (194 semantic categories with keyword lists)
+//   - 81-language sentiment (83 languages, binary polarity)
 package ingest
 
 import (
@@ -760,6 +766,419 @@ func Import81LangSentiment(dir string, targetLangs map[string]bool) ([]Entry, Re
 	}
 
 	return entries, res, nil
+}
+
+// ImportOpLexicon reads OpLexicon v3.0 (PT-BR sentiment lexicon).
+// Format: word,POS,polarity(-1/0/1),annotator
+// Skips emoticons, hashtags, and non-alphabetic entries.
+func ImportOpLexicon(path string) ([]Entry, Result, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, Result{}, err
+	}
+	defer f.Close()
+
+	var entries []Entry
+	res := Result{ByPolarity: make(map[string]int)}
+	seen := make(map[string]bool)
+	scanner := bufio.NewScanner(f)
+
+	posMap := map[string]string{
+		"adj": "ADJ", "vb": "VERB", "n": "NOUN", "adv": "ADV",
+		"emot": "", "htag": "",
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ",")
+		if len(parts) < 3 {
+			res.Errors++
+			continue
+		}
+
+		word := strings.TrimSpace(parts[0])
+		posTag := strings.TrimSpace(parts[1])
+		valStr := strings.TrimSpace(parts[2])
+
+		// Skip emoticons, hashtags, non-words
+		if posTag == "emot" || posTag == "htag" {
+			continue
+		}
+		if !isAlpha(word) || strings.Contains(word, " ") {
+			continue
+		}
+		// Skip reflexive forms (ababelar-se → already have ababelar)
+		if strings.Contains(word, "-se") || strings.Contains(word, "-lhe") {
+			continue
+		}
+
+		norm := normalize(word)
+		if seen[norm] {
+			continue
+		}
+		seen[norm] = true
+
+		val, err := strconv.Atoi(valStr)
+		if err != nil {
+			res.Errors++
+			continue
+		}
+
+		var polarity string
+		switch val {
+		case 1:
+			polarity = "POSITIVE"
+		case -1:
+			polarity = "NEGATIVE"
+		default:
+			polarity = "NEUTRAL"
+		}
+
+		umcsPOS := posMap[posTag]
+
+		e := Entry{
+			Word:      word,
+			Lang:      "PT",
+			Norm:      norm,
+			Polarity:  polarity,
+			Intensity: "MODERATE",
+			POS:       umcsPOS,
+			Source:    "OpLexicon",
+		}
+
+		entries = append(entries, e)
+		res.Total++
+		res.ByPolarity[polarity]++
+	}
+
+	return entries, res, scanner.Err()
+}
+
+// ImportSentiLex reads SentiLex-PT02 (Portuguese sentiment lexicon).
+// Format: lemma.PoS=TAG;TG=target;POL:N0=val;ANOT=annotator
+// Example: abafado.PoS=Adj;TG=HUM:N0;POL:N0=-1;ANOT=JALC
+func ImportSentiLex(path string) ([]Entry, Result, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, Result{}, err
+	}
+	defer f.Close()
+
+	var entries []Entry
+	res := Result{ByPolarity: make(map[string]int)}
+	scanner := bufio.NewScanner(f)
+
+	posMap := map[string]string{
+		"Adj": "ADJ", "V": "VERB", "N": "NOUN", "ADV": "ADV",
+		"IDIOM": "", "Adv": "ADV",
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Split lemma from metadata
+		dotIdx := strings.Index(line, ".PoS=")
+		if dotIdx < 0 {
+			res.Errors++
+			continue
+		}
+
+		word := line[:dotIdx]
+		if !isAlpha(word) || strings.Contains(word, " ") {
+			continue
+		}
+
+		meta := line[dotIdx+5:] // after ".PoS="
+
+		// Extract POS
+		semiIdx := strings.Index(meta, ";")
+		posTag := meta
+		if semiIdx >= 0 {
+			posTag = meta[:semiIdx]
+		}
+
+		// Extract polarity from POL:N0=val
+		polVal := 0
+		if polIdx := strings.Index(line, "POL:N0="); polIdx >= 0 {
+			valPart := line[polIdx+7:]
+			if semi := strings.Index(valPart, ";"); semi >= 0 {
+				valPart = valPart[:semi]
+			}
+			if v, err := strconv.Atoi(valPart); err == nil {
+				polVal = v
+			}
+		}
+
+		var polarity string
+		switch {
+		case polVal > 0:
+			polarity = "POSITIVE"
+		case polVal < 0:
+			polarity = "NEGATIVE"
+		default:
+			polarity = "NEUTRAL"
+		}
+
+		umcsPOS := posMap[posTag]
+
+		e := Entry{
+			Word:      word,
+			Lang:      "PT",
+			Norm:      normalize(word),
+			Polarity:  polarity,
+			Intensity: "MODERATE",
+			POS:       umcsPOS,
+			Source:    "SentiLex",
+		}
+
+		entries = append(entries, e)
+		res.Total++
+		res.ByPolarity[polarity]++
+	}
+
+	return entries, res, scanner.Err()
+}
+
+// ImportLexique383 reads Lexique 3.83 (French lexicon with frequency + phonology).
+// TSV with header: ortho, phon, lemme, cgram, genre, nombre, freqfilms2, ...
+// Extracts: word, phonology (SAMPA), POS, frequency rank, syllable count.
+func ImportLexique383(path string) ([]Entry, Result, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, Result{}, err
+	}
+	defer f.Close()
+
+	var entries []Entry
+	res := Result{ByPolarity: make(map[string]int)}
+	seen := make(map[string]bool)
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	// Read header
+	if !scanner.Scan() {
+		return nil, res, fmt.Errorf("empty file")
+	}
+	header := strings.Split(scanner.Text(), "\t")
+	idx := make(map[string]int)
+	for i, h := range header {
+		idx[h] = i
+	}
+
+	orthoCol := idx["ortho"]
+	phonCol := idx["phon"]
+	cgramCol := idx["cgram"]
+	freqCol := idx["freqfilms2"]
+	syllCol := idx["nbsyll"]
+
+	cgramMap := map[string]string{
+		"NOM": "NOUN", "VER": "VERB", "ADJ": "ADJ", "ADV": "ADV",
+		"AUX": "VERB", "PRE": "PREP", "CON": "CONJ", "PRO": "PRON",
+		"ART": "DET", "ONO": "INTJ",
+	}
+
+	for scanner.Scan() {
+		parts := strings.Split(scanner.Text(), "\t")
+		if len(parts) <= syllCol {
+			res.Errors++
+			continue
+		}
+
+		word := strings.TrimSpace(parts[orthoCol])
+		if !isAlpha(word) || strings.Contains(word, " ") {
+			continue
+		}
+
+		norm := normalize(word)
+		if seen[norm] {
+			continue
+		}
+		seen[norm] = true
+
+		phon := strings.TrimSpace(parts[phonCol])
+		cgram := strings.TrimSpace(parts[cgramCol])
+		umcsPOS := cgramMap[cgram]
+
+		freq, _ := strconv.ParseFloat(parts[freqCol], 64)
+		nsyll, _ := strconv.Atoi(parts[syllCol])
+
+		// Convert frequency to rank (higher freq = lower rank)
+		freqRank := 0
+		if freq > 0 {
+			freqRank = int(50000.0 / (freq + 1.0))
+			if freqRank < 1 {
+				freqRank = 1
+			}
+			if freqRank > 50000 {
+				freqRank = 50000
+			}
+		}
+
+		e := Entry{
+			Word:      word,
+			Lang:      "FR",
+			Norm:      norm,
+			Polarity:  "NEUTRAL", // Lexique has no sentiment, but provides phonology+freq
+			Intensity: "NONE",
+			POS:       umcsPOS,
+			IPA:       phon,
+			Syllables: nsyll,
+			FreqRank:  freqRank,
+			Source:    "Lexique383",
+		}
+
+		entries = append(entries, e)
+		res.Total++
+		res.ByPolarity["NEUTRAL"]++
+	}
+
+	return entries, res, scanner.Err()
+}
+
+// ImportMPQA reads the MPQA Subjectivity Lexicon (JSON format: word → polarity).
+// Polarity values: 1 (positive), -1 (negative), 0 (neutral).
+func ImportMPQA(path string) ([]Entry, Result, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, Result{}, err
+	}
+
+	// Parse JSON manually since it's a simple {word: int} map
+	// The file is one big JSON object
+	var entries []Entry
+	res := Result{ByPolarity: make(map[string]int)}
+
+	content := strings.TrimSpace(string(data))
+	if len(content) < 2 || content[0] != '{' {
+		return nil, res, fmt.Errorf("invalid MPQA JSON format")
+	}
+	content = content[1 : len(content)-1] // strip {}
+
+	// Split by comma, parse key-value pairs
+	for _, pair := range splitJSONPairs(content) {
+		pair = strings.TrimSpace(pair)
+		colonIdx := strings.LastIndex(pair, ":")
+		if colonIdx < 0 {
+			continue
+		}
+
+		key := strings.TrimSpace(pair[:colonIdx])
+		valStr := strings.TrimSpace(pair[colonIdx+1:])
+
+		// Remove quotes from key
+		if len(key) >= 2 && key[0] == '"' {
+			key = key[1 : len(key)-1]
+		}
+		if !isAlpha(key) || strings.Contains(key, " ") {
+			continue
+		}
+
+		val, err := strconv.Atoi(valStr)
+		if err != nil {
+			res.Errors++
+			continue
+		}
+
+		var polarity string
+		switch val {
+		case 1:
+			polarity = "POSITIVE"
+		case -1:
+			polarity = "NEGATIVE"
+		default:
+			polarity = "NEUTRAL"
+		}
+
+		e := Entry{
+			Word:      key,
+			Lang:      "EN",
+			Norm:      normalize(key),
+			Polarity:  polarity,
+			Intensity: "MODERATE",
+			Source:    "MPQA",
+		}
+
+		entries = append(entries, e)
+		res.Total++
+		res.ByPolarity[polarity]++
+	}
+
+	return entries, res, nil
+}
+
+// splitJSONPairs splits a JSON object body by top-level commas.
+func splitJSONPairs(s string) []string {
+	var pairs []string
+	depth := 0
+	start := 0
+	inStr := false
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '"':
+			if i == 0 || s[i-1] != '\\' {
+				inStr = !inStr
+			}
+		case '{', '[':
+			if !inStr {
+				depth++
+			}
+		case '}', ']':
+			if !inStr {
+				depth--
+			}
+		case ',':
+			if !inStr && depth == 0 {
+				pairs = append(pairs, s[start:i])
+				start = i + 1
+			}
+		}
+	}
+	if start < len(s) {
+		pairs = append(pairs, s[start:])
+	}
+	return pairs
+}
+
+// ImportEmpath reads Empath semantic categories (TSV: category \t word1 word2 ...).
+// Returns a map of category → word list for semantic domain enrichment.
+func ImportEmpath(path string) (map[string][]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	result := make(map[string][]string)
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, "\t")
+		if len(parts) < 2 {
+			continue
+		}
+		category := strings.TrimSpace(parts[0])
+		if category == "" {
+			continue
+		}
+		var words []string
+		for _, w := range parts[1:] {
+			w = strings.TrimSpace(w)
+			if w != "" && isAlpha(w) {
+				words = append(words, w)
+			}
+		}
+		if len(words) > 0 {
+			result[category] = words
+		}
+	}
+
+	return result, scanner.Err()
 }
 
 // Merge deduplicates entries by (norm, lang), preferring entries with more data.
