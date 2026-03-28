@@ -51,6 +51,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/emotion", s.handleEmotion)
 	mux.HandleFunc("/drift", s.handleDrift)
 	mux.HandleFunc("/crosslingual", s.handleCrossLingual)
+	mux.HandleFunc("/sarcasm", s.handleSarcasm)
+	mux.HandleFunc("/hate", s.handleHate)
+	mux.HandleFunc("/bias", s.handleBias)
+	mux.HandleFunc("/compress", s.handleCompress)
 	mux.HandleFunc("/search", s.handleSearch)
 	mux.HandleFunc("/phonology", s.handlePhonology)
 	mux.HandleFunc("/embeddings", s.handleEmbeddings)
@@ -1032,4 +1036,116 @@ func readBody(r *http.Request) (string, error) {
 	}
 	b, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1MB limit
 	return strings.TrimSpace(string(b)), err
+}
+
+func (s *Server) handleSarcasm(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	text := r.URL.Query().Get("text")
+	if text == "" && r.Method == http.MethodPost {
+		var err error
+		text, err = readBody(r)
+		if err != nil {
+			httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if text == "" {
+		httpErr(w, "missing text", 400)
+		return
+	}
+
+	result := analyze.DetectSarcasm(text)
+	jsonOK(w, result)
+}
+
+func (s *Server) handleHate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	text := r.URL.Query().Get("text")
+	if text == "" && r.Method == http.MethodPost {
+		var err error
+		text, err = readBody(r)
+		if err != nil {
+			httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if text == "" {
+		httpErr(w, "missing text", 400)
+		return
+	}
+
+	result := analyze.DetectHateSpeech(text)
+	jsonOK(w, result)
+}
+
+func (s *Server) handleBias(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	text := r.URL.Query().Get("text")
+	if text == "" && r.Method == http.MethodPost {
+		var err error
+		text, err = readBody(r)
+		if err != nil {
+			httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if text == "" {
+		httpErr(w, "missing text", 400)
+		return
+	}
+
+	result := analyze.DetectPoliticalBias(text)
+	jsonOK(w, result)
+}
+
+func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 10<<20)) // 10MB limit
+	if err != nil {
+		httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Text      string `json:"text"`
+		Data      []int  `json:"data"`
+		Algorithm string `json:"algorithm"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		httpErr(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	algo := analyze.CompressionAlgorithm(req.Algorithm)
+	if algo == "" {
+		algo = analyze.AlgoRLE
+	}
+
+	var result *analyze.CompressionResult
+	if req.Text != "" {
+		result = analyze.Compress(req.Text, algo)
+	} else if len(req.Data) > 0 {
+		result = analyze.Compress(req.Data, algo)
+	} else {
+		httpErr(w, "missing text or data field", 400)
+		return
+	}
+
+	jsonOK(w, result)
 }

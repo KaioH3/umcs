@@ -543,6 +543,19 @@ curl "localhost:8080/crosslingual?word=terrible"
 | GET | `/phonology?word=X` | IPA, syllables, stress, valency |
 | GET | `/embeddings?limit=N` | Root-indexed 9D semantic vectors |
 | POST | `/ground` | LLM sentiment grounding + conflict detection |
+| GET/POST | `/sarcasm?text=...` | Multi-language sarcasm detection |
+| GET/POST | `/hate?text=...` | Hate speech detection (8 categories) |
+| GET/POST | `/bias?text=...` | Political bias detection (LEFT/RIGHT/CENTER) |
+| POST | `/compress` | Dataset compression (RLE, LZ77, Delta, BWT) |
+
+### Export Formats
+
+| Format | Endpoint | Size (typical) |
+|--------|----------|----------------|
+| JSON | `/vocab` | 177MB |
+| JSONL | `/vocab?format=jsonl` | streaming |
+| Gob | `/vocab?format=gob` | 60MB |
+| Msgpack | `/vocab?format=msgpack` | 106MB |
 
 ### LLM Integration Endpoints
 
@@ -562,6 +575,50 @@ Checks if generated text matches expected sentiment, reports conflicting tokens,
 curl -X POST localhost:8080/ground \
   -d '{"text":"I absolutely love this terrible disaster","expected_sentiment":"POSITIVE"}'
 # → {"matches": false, "conflicts": [{"word":"terrible","polarity":"NEGATIVE"}], ...}
+```
+
+#### `/sarcasm` — Multi-language sarcasm detection
+
+Detects sarcasm using linguistic patterns: laughing (haha, kkk), elongation (loooove), quotation marks, sarcastic questions, contrast. Supports 15+ languages.
+
+```bash
+curl -X POST localhost:8080/sarcasm \
+  -d '{"text": "Oh wonderful, another meeting that could have been an email"}'
+# → {"is_sarcastic": true, "confidence": 0.85, "patterns": ["contrast", "rhetorical_question"]}
+```
+
+#### `/hate` — Hate speech detection
+
+Detects 8 categories: RACISM, SEXISM, HOMOPHOBIA, RELIGIOUS_HATRED, VIOLENCE, ABLEISM, GORDOPHOBIA, CAPACITISM
+
+```bash
+curl -X POST localhost:8080/hate \
+  -d '{"text": "you should all be ashamed"}'
+# → {"is_hate": true, "categories": ["VIOLENCE"], "confidence": 0.78}
+```
+
+#### `/bias` — Political bias detection
+
+Detects LEFT, RIGHT, or CENTER political leaning.
+
+```bash
+curl -X POST localhost:8080/bias \
+  -d '{"text": "we need to fight for workers rights and social justice"}'
+# → {"bias": "LEFT", "confidence": 0.82}
+```
+
+#### `/compress` — Dataset compression
+
+Compress text data using RLE, LZ77, Delta, or BWT algorithms. Useful for creating compact training datasets.
+
+```bash
+curl -X POST localhost:8080/compress \
+  -d '{"text": "AAAABBBCCDAA", "algorithm": "rle"}'
+# → {"original_size": 12, "compressed": "4A3B2C2D2A", "compressed_size": 10, "ratio": 0.83}
+
+curl -X POST localhost:8080/compress \
+  -d '{"data": [10,15,18,25,30], "algorithm": "delta"}'
+# → {"original_size": 5, "compressed": [10,5,3,7,5], "compressed_size": 5, "ratio": 1.0}
 ```
 
 ---
