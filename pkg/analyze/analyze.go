@@ -204,7 +204,9 @@ type EmotionProfile struct {
 // EmotionDecompose extracts an emotion profile from the analysis result.
 // Uses Plutchik's wheel mapped to UMCS dimensions:
 //
-//	polarity × arousal × dominance → emotion weights.
+// EmotionDecompose maps sentiment to Plutchik's 8 primary emotions.
+// Uses VAD (Valence, Arousal, Dominance) from lexicon, with fallback heuristics
+// when data is unavailable.
 func EmotionDecompose(r Result, lex *lexdb.Lexicon) EmotionProfile {
 	var ep EmotionProfile
 	var total float64
@@ -219,10 +221,24 @@ func EmotionDecompose(r Result, lex *lexdb.Lexicon) EmotionProfile {
 		}
 
 		s := sentiment.Decode(w.Sentiment)
-		pol := polVal(s["polarity"])
-		aro := aroVal(s["arousal"])
-		dom := domVal(s["dominance"])
-		inten := intenVal(s["intensity"])
+		polStr := s["polarity"]
+		pol := polVal(polStr)
+
+		// Use VAD from lexicon if available, otherwise infer from intensity/polarity
+		aroStr := s["arousal"]
+		aro := aroVal(aroStr)
+		if aroStr == "NONE" || aroStr == "" {
+			aro = inferArousal(s["intensity"])
+		}
+
+		domStr := s["dominance"]
+		dom := domVal(domStr)
+		if domStr == "NONE" || domStr == "" {
+			dom = inferDominance(polStr)
+		}
+
+		intenStr := s["intensity"]
+		inten := intenVal(intenStr)
 
 		weight := inten
 		if weight == 0 {
@@ -230,27 +246,35 @@ func EmotionDecompose(r Result, lex *lexdb.Lexicon) EmotionProfile {
 		}
 
 		// Plutchik mapping: polarity × arousal × dominance → emotion
+		// Joy: positive + high arousal + high dominance
 		if pol > 0 && aro > 0.5 && dom > 0.5 {
 			ep.Joy += weight
 		}
+		// Trust: positive + low arousal + high dominance
 		if pol > 0 && aro <= 0.5 && dom > 0.5 {
 			ep.Trust += weight
 		}
+		// Serenity: positive + low arousal
 		if pol > 0 && aro <= 0.5 {
 			ep.Serenity += weight
 		}
-		if pol < 0 && aro > 0.5 && dom <= 0.5 {
+		// Fear: negative + high arousal + low dominance
+		if pol < 0 && aro > 0.5 && dom <= 0.35 {
 			ep.Fear += weight
 		}
-		if pol < 0 && aro > 0.5 && dom > 0.5 {
+		// Anger: negative + high arousal + high dominance
+		if pol < 0 && aro > 0.5 && dom > 0.35 {
 			ep.Anger += weight
 		}
-		if pol < 0 && aro <= 0.5 {
+		// Sadness: negative + low arousal (not high)
+		if pol < 0 && aro < 0.5 {
 			ep.Sadness += weight
 		}
+		// Surprise: high arousal + neutral polarity
 		if aro > 0.7 && pol == 0 {
 			ep.Surprise += weight
 		}
+		// Disgust: negative + high arousal + high intensity
 		if pol < 0 && aro > 0.5 && inten > 0.5 {
 			ep.Disgust += weight
 		}
@@ -314,6 +338,21 @@ func aroVal(s string) float64 {
 	}
 }
 
+// inferArousal estimates arousal from intensity when VAD data is unavailable.
+// High intensity words tend to have high arousal.
+func inferArousal(intensity string) float64 {
+	switch intensity {
+	case "STRONG", "EXTREME":
+		return 0.8 // HIGH
+	case "MODERATE":
+		return 0.5 // MED
+	case "WEAK":
+		return 0.25 // LOW
+	default:
+		return 0.3 // Default to low-medium for unknown
+	}
+}
+
 // domVal converts dominance string to numeric value.
 func domVal(s string) float64 {
 	switch s {
@@ -325,6 +364,19 @@ func domVal(s string) float64 {
 		return 0.25
 	default:
 		return 0.5 // default to mid
+	}
+}
+
+// inferDominance estimates dominance from polarity when VAD data is unavailable.
+// Negative emotions often have lower dominance (feeling overwhelmed).
+func inferDominance(polarity string) float64 {
+	switch polarity {
+	case "NEGATIVE":
+		return 0.25 // LOW - negative emotions often feel overwhelming
+	case "POSITIVE":
+		return 0.7 // HIGH - positive emotions feel empowering
+	default:
+		return 0.5 // MED - neutral
 	}
 }
 
