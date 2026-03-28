@@ -2,6 +2,7 @@
 package api
 
 import (
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/kak/umcs/pkg/phon"
 	"github.com/kak/umcs/pkg/sentiment"
 	"github.com/kak/umcs/pkg/tokenizer"
+	"github.com/ugorji/go/codec"
 )
 
 // Server holds the loaded lexicon and serves HTTP requests.
@@ -102,11 +104,11 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{
-		"roots":                s.lex.Stats.RootCount,
-		"words":                s.lex.Stats.WordCount,
-		"heap_bytes":           s.lex.Stats.HeapSize,
-		"file_bytes":           s.lex.Stats.FileSize,
-		"by_lang":              byLang,
+		"roots":                 s.lex.Stats.RootCount,
+		"words":                 s.lex.Stats.WordCount,
+		"heap_bytes":            s.lex.Stats.HeapSize,
+		"file_bytes":            s.lex.Stats.FileSize,
+		"by_lang":               byLang,
 		"avg_cognates_per_root": avgCognates,
 	})
 }
@@ -461,9 +463,9 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 			lang := lexdb.LangName(c.Lang)
 			sent := sentiment.Decode(c.Sentiment)
 			byLang[lang] = append(byLang[lang], map[string]any{
-				"word":    s.lex.WordStr(&c),
-				"word_id": c.WordID,
-				"polarity": sent["polarity"],
+				"word":      s.lex.WordStr(&c),
+				"word_id":   c.WordID,
+				"polarity":  sent["polarity"],
 				"intensity": sent["intensity"],
 			})
 		}
@@ -528,11 +530,16 @@ func (s *Server) handleAnalyzeBatch(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, results)
 }
 
-// handleVocab exports the vocabulary in a HuggingFace-compatible tokenizer format.
+// handleVocab exports the vocabulary in multiple formats: json, jsonl, gob, ubjson.
 func (s *Server) handleVocab(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		httpErr(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "json"
 	}
 
 	vocab := make(map[string]uint32, len(s.lex.Words))
@@ -549,7 +556,7 @@ func (s *Server) handleVocab(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	jsonOK(w, map[string]any{
+	data := map[string]any{
 		"version": "1.0",
 		"model": map[string]any{
 			"type":        "morpheme",
@@ -558,7 +565,51 @@ func (s *Server) handleVocab(w http.ResponseWriter, r *http.Request) {
 		},
 		"vocab":    vocab,
 		"root_map": rootMap,
-	})
+	}
+
+	switch format {
+	case "json":
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(data); err != nil {
+			log.Printf("vocab json encode error: %v", err)
+		}
+
+	case "jsonl":
+		w.Header().Set("Content-Type", "application/jsonl+json")
+		enc := json.NewEncoder(w)
+		if err := enc.Encode(data["model"]); err != nil {
+			log.Printf("vocab jsonl encode error: %v", err)
+			return
+		}
+		for word, id := range data["vocab"].(map[string]uint32) {
+			if err := enc.Encode(map[string]any{"word": word, "id": id}); err != nil {
+				log.Printf("vocab jsonl encode error: %v", err)
+				return
+			}
+		}
+		for id, root := range data["root_map"].(map[uint32]uint32) {
+			if err := enc.Encode(map[string]any{"root_id": id, "root": root}); err != nil {
+				log.Printf("vocab jsonl encode error: %v", err)
+				return
+			}
+		}
+
+	case "gob":
+		w.Header().Set("Content-Type", `application/gob`)
+		if err := gob.NewEncoder(w).Encode(data); err != nil {
+			log.Printf("vocab gob encode error: %v", err)
+		}
+
+	case "ubjson":
+		w.Header().Set("Content-Type", `application/ubjson`)
+		enc := codec.NewEncoder(w, &codec.JsonHandle{})
+		if err := enc.Encode(data); err != nil {
+			log.Printf("vocab ubjson encode error: %v", err)
+		}
+
+	default:
+		httpErr(w, "invalid format: use json, jsonl, gob, or ubjson", http.StatusBadRequest)
+	}
 }
 
 func (s *Server) handleSentimentDecode(w http.ResponseWriter, r *http.Request) {
@@ -674,8 +725,8 @@ func (s *Server) handleDrift(w http.ResponseWriter, r *http.Request) {
 		"summary": map[string]any{
 			"max_positive": summary.MaxPositive,
 			"max_negative": summary.MaxNegative,
-			"volatility":  summary.Volatility,
-			"shifts":      summary.Shifts,
+			"volatility":   summary.Volatility,
+			"shifts":       summary.Shifts,
 		},
 		"points": points,
 	})
@@ -804,12 +855,12 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type embedding struct {
-		RootID     uint32    `json:"root_id"`
-		Root       string    `json:"root"`
-		Meaning    string    `json:"meaning"`
-		Vector     []float64 `json:"vector"`
-		LangCount  int       `json:"lang_count"`
-		WordCount  int       `json:"word_count"`
+		RootID    uint32    `json:"root_id"`
+		Root      string    `json:"root"`
+		Meaning   string    `json:"meaning"`
+		Vector    []float64 `json:"vector"`
+		LangCount int       `json:"lang_count"`
+		WordCount int       `json:"word_count"`
 	}
 
 	embeddings := make([]embedding, 0, limit)
@@ -840,14 +891,20 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		for _, wr := range s.lex.Words[start:end] {
 			sent := wr.Sentiment
 			pol := float64(sentiment.Polarity(sent))
-			if pol == 2 { pol = -1 } // NEGATIVE → -1
-			if pol == 3 { pol = 0 }  // AMBIGUOUS → 0
+			if pol == 2 {
+				pol = -1
+			} // NEGATIVE → -1
+			if pol == 3 {
+				pol = 0
+			} // AMBIGUOUS → 0
 			vec[0] += pol
 			vec[1] += float64(sentiment.Intensity(sent)) / 4.0
 			vec[2] += float64(sentiment.Arousal(sent)) / 3.0
 			vec[3] += float64(sentiment.Dominance(sent)) / 3.0
 			vec[4] += float64(sentiment.AOA(sent)) / 3.0
-			if sent&(1<<28) != 0 { vec[5] += 1.0 }
+			if sent&(1<<28) != 0 {
+				vec[5] += 1.0
+			}
 			vec[6] += float64(sentiment.POS(sent)) / 7.0
 			vec[7] += float64(sentiment.Role(sent)) / 11.0
 			vec[8] += float64(phon.Syllables(wr.Flags)) / 15.0
@@ -938,17 +995,17 @@ func (s *Server) handleGround(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{
-		"text":               req.Text,
-		"expected":           req.ExpectedSentiment,
-		"actual_verdict":     result.Verdict,
-		"actual_score":       result.TotalScore,
-		"matches":            matches,
-		"coverage":           confidence,
-		"dominant_emotion":   ep.Dominant,
-		"drift_pattern":      summary.Pattern,
-		"conflicts":          conflicts,
-		"conflict_count":     len(conflicts),
-		"recommendation":     groundRecommendation(matches, len(conflicts), confidence),
+		"text":             req.Text,
+		"expected":         req.ExpectedSentiment,
+		"actual_verdict":   result.Verdict,
+		"actual_score":     result.TotalScore,
+		"matches":          matches,
+		"coverage":         confidence,
+		"dominant_emotion": ep.Dominant,
+		"drift_pattern":    summary.Pattern,
+		"conflicts":        conflicts,
+		"conflict_count":   len(conflicts),
+		"recommendation":   groundRecommendation(matches, len(conflicts), confidence),
 	})
 }
 
