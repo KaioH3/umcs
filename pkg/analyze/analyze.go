@@ -479,26 +479,58 @@ func SummarizeDrift(points []DriftPoint) DriftSummary {
 
 	s.Volatility = sumAbsDelta / float64(len(points))
 
-	// Classify pattern
+	// Classify pattern - improved detection
 	first := points[0].Score
 	last := points[len(points)-1].Score
-	mid := points[len(points)/2].Score
+
+	// Find the peak (max) and valley (min) for better pattern detection
+	var peakScore, valleyScore float64
+	peakIdx, valleyIdx := 0, 0
+	for i, p := range points {
+		if p.Score > peakScore {
+			peakScore = p.Score
+			peakIdx = i
+		}
+		if p.Score < valleyScore {
+			valleyScore = p.Score
+			valleyIdx = i
+		}
+	}
+
+	// Analyze trajectory
+	hasPositive := peakScore > 0.5
+	hasNegative := valleyScore < -0.5
+	hasSignificantShift := s.Shifts >= 1 || s.Volatility > 0.5
 
 	switch {
-	case s.Volatility < 0.1:
+	case s.Volatility < 0.3 && s.Shifts == 0:
 		s.Pattern = "STABLE"
-	case s.Shifts >= 3:
+	case s.Shifts >= 3 || s.Volatility > 2.0:
 		s.Pattern = "VOLATILE"
-	case last > first+1 && mid > first:
+	case hasPositive && hasNegative && peakIdx < valleyIdx:
+		// Positive → Negative (DESCENDING or V-SHAPE)
+		if valleyIdx > len(points)/2 && first >= 0 {
+			s.Pattern = "V-SHAPE"
+		} else {
+			s.Pattern = "DESCENDING"
+		}
+	case hasPositive && hasNegative && peakIdx > valleyIdx:
+		// Negative → Positive (ASCENDING or INV-V)
+		if peakIdx > len(points)/2 && last >= 0 {
+			s.Pattern = "INV-V"
+		} else {
+			s.Pattern = "ASCENDING"
+		}
+	case last > first+1 && !hasNegative:
 		s.Pattern = "ASCENDING"
-	case last < first-1 && mid < first:
+	case last < first-1 && !hasPositive:
 		s.Pattern = "DESCENDING"
-	case mid < first && mid < last:
-		s.Pattern = "V-SHAPE"
-	case mid > first && mid > last:
-		s.Pattern = "INV-V"
 	default:
-		s.Pattern = "STABLE"
+		if hasSignificantShift {
+			s.Pattern = "VOLATILE"
+		} else {
+			s.Pattern = "STABLE"
+		}
 	}
 
 	return s
