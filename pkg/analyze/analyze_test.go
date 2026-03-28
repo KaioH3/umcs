@@ -153,8 +153,8 @@ func TestDowntonerThenNegation(t *testing.T) {
 	}
 }
 
-// TestVerdictBoundary verifies that the threshold is strict (> 2, < -2).
-// Score of exactly 2 or -2 → NEUTRAL.
+// TestVerdictBoundary verifies the threshold is inclusive (>= 2, <= -2).
+// Score of exactly 2 or -2 now returns POSITIVE/NEGATIVE.
 func TestVerdictBoundary(t *testing.T) {
 	lex := buildTestLex(t)
 
@@ -163,12 +163,12 @@ func TestVerdictBoundary(t *testing.T) {
 		verdict string
 		desc    string
 	}{
-		// "good" MODERATE weight=2 → score=2 → NEUTRAL (not > 2)
-		{"good", "NEUTRAL", "score=2 → NEUTRAL"},
+		// "good" MODERATE weight=2 → score=2 → POSITIVE (>= 2)
+		{"good", "POSITIVE", "score=2 → POSITIVE"},
 		// "terrible" STRONG weight=-3 → score=-3 → NEGATIVE
 		{"terrible", "NEGATIVE", "score=-3 → NEGATIVE"},
-		// "negative" MODERATE(-2) → score=-2 → NEUTRAL (not < -2)
-		{"negative", "NEUTRAL", "score=-2 → NEUTRAL"},
+		// "negative" MODERATE(-2) → score=-2 → NEGATIVE (<= -2)
+		{"negative", "NEGATIVE", "score=-2 → NEGATIVE"},
 	}
 	for _, c := range cases {
 		r := analyze.Analyze(lex, c.text)
