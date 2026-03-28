@@ -142,9 +142,9 @@ func Analyze(lex *lexdb.Lexicon, text string) Result {
 
 	verdict := "NEUTRAL"
 	switch {
-	case totalScore > 2:
+	case totalScore >= 2:
 		verdict = "POSITIVE"
-	case totalScore < -2:
+	case totalScore <= -2:
 		verdict = "NEGATIVE"
 	}
 
@@ -190,20 +190,21 @@ func min(a, b int) int {
 // EmotionProfile holds fine-grained emotion scores derived from
 // the morpheme-level sentiment dimensions. All values in [0.0, 1.0].
 type EmotionProfile struct {
-	Joy       float64 // high valence + high arousal + high dominance
-	Trust     float64 // positive polarity + low arousal + high dominance
-	Fear      float64 // negative polarity + high arousal + low dominance
-	Anger     float64 // negative polarity + high arousal + high dominance
-	Sadness   float64 // negative polarity + low arousal + low dominance
-	Surprise  float64 // high arousal + neutral polarity
-	Disgust   float64 // strongly negative + high arousal
-	Serenity  float64 // positive + low arousal
-	Dominant  string  // the strongest emotion label
+	Joy      float64 // high valence + high arousal + high dominance
+	Trust    float64 // positive polarity + low arousal + high dominance
+	Fear     float64 // negative polarity + high arousal + low dominance
+	Anger    float64 // negative polarity + high arousal + high dominance
+	Sadness  float64 // negative polarity + low arousal + low dominance
+	Surprise float64 // high arousal + neutral polarity
+	Disgust  float64 // strongly negative + high arousal
+	Serenity float64 // positive + low arousal
+	Dominant string  // the strongest emotion label
 }
 
 // EmotionDecompose extracts an emotion profile from the analysis result.
 // Uses Plutchik's wheel mapped to UMCS dimensions:
-//   polarity × arousal × dominance → emotion weights.
+//
+//	polarity × arousal × dominance → emotion weights.
 func EmotionDecompose(r Result, lex *lexdb.Lexicon) EmotionProfile {
 	var ep EmotionProfile
 	var total float64
@@ -465,10 +466,10 @@ func abs(x float64) float64 {
 // a word's meaning transcends its surface form.
 //
 // Algorithm:
-//   1. Look up the word in the lexicon
-//   2. Find its root
-//   3. Enumerate all cognates (words sharing the same root)
-//   4. Aggregate sentiment across all cognates
+//  1. Look up the word in the lexicon
+//  2. Find its root
+//  3. Enumerate all cognates (words sharing the same root)
+//  4. Aggregate sentiment across all cognates
 //
 // Returns: consensus polarity, confidence [0,1], and number of languages.
 func CrossLingualScore(lex *lexdb.Lexicon, word string) (polarity string, confidence float64, nLangs int) {
