@@ -600,15 +600,15 @@ func (s *Server) handleVocab(w http.ResponseWriter, r *http.Request) {
 			log.Printf("vocab gob encode error: %v", err)
 		}
 
-	case "ubjson":
-		w.Header().Set("Content-Type", `application/ubjson`)
-		enc := codec.NewEncoder(w, &codec.JsonHandle{})
+	case "msgpack":
+		w.Header().Set("Content-Type", `application/msgpack`)
+		enc := codec.NewEncoder(w, &codec.MsgpackHandle{})
 		if err := enc.Encode(data); err != nil {
-			log.Printf("vocab ubjson encode error: %v", err)
+			log.Printf("vocab msgpack encode error: %v", err)
 		}
 
 	default:
-		httpErr(w, "invalid format: use json, jsonl, gob, or ubjson", http.StatusBadRequest)
+		httpErr(w, "invalid format: use json, jsonl, gob, or msgpack", http.StatusBadRequest)
 	}
 }
 
