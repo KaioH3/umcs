@@ -39,6 +39,16 @@ func main() {
 
 	// ═══ Phase 1: Sentiment-bearing datasets ═══════════════════════════════
 
+	// NRC VAD Lexicon v2.1 (EN) - Valence, Arousal, Dominance
+	importDataset(&allEntries, "NRC-VAD", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportNRCVAD(filepath.Join(extDir, "NRC-VAD", "NRC-VAD-Lexicon-v2.1", "NRC-VAD-Lexicon-v2.1.txt"))
+	})
+
+	// Warriner VAD (EN) - additional VAD norms
+	importDataset(&allEntries, "Warriner", func() ([]ingest.Entry, ingest.Result, error) {
+		return ingest.ImportWarrinerVAD(filepath.Join(extDir, "Warriner_VAD.csv"))
+	})
+
 	// OpLexicon v3.0 (PT)
 	importDataset(&allEntries, "OpLexicon", func() ([]ingest.Entry, ingest.Result, error) {
 		return ingest.ImportOpLexicon(filepath.Join(extDir, "OpLexicon_v3.0.txt"))
