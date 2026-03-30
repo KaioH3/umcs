@@ -34,3 +34,11 @@ vendor/
 
 # Old capi directory
 /capi
+
+# LinkedIn strategy (personal)
+LINKEDIN_GUIDE.md
+BENCHMARK.md
+resume.txt
+vocab.gob
+showcase
+fusedimport
