@@ -283,9 +283,45 @@ func langBitFromStr(lang string) uint32 {
 	return LangBit(id)
 }
 
-// normalize lowercases an ASCII string (diacritics already stripped in CSV norm column).
 func normalize(s string) string {
-	return strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
+		switch r {
+		case 'á', 'à', 'â', 'ã', 'ä', 'å', 'ā', 'ă', 'ą':
+			b.WriteByte('a')
+		case 'é', 'è', 'ê', 'ë', 'ē', 'ě', 'ę':
+			b.WriteByte('e')
+		case 'í', 'ì', 'î', 'ï', 'ī', 'ĭ', 'į':
+			b.WriteByte('i')
+		case 'ó', 'ò', 'ô', 'õ', 'ö', 'ō', 'ő', 'ø':
+			b.WriteByte('o')
+		case 'ú', 'ù', 'û', 'ü', 'ū', 'ű', 'ů':
+			b.WriteByte('u')
+		case 'ý', 'ÿ':
+			b.WriteByte('y')
+		case 'ç', 'ć', 'č':
+			b.WriteByte('c')
+		case 'ñ', 'ń', 'ň':
+			b.WriteByte('n')
+		case 'š', 'ś', 'ş':
+			b.WriteByte('s')
+		case 'ž', 'ź', 'ż':
+			b.WriteByte('z')
+		case 'đ', 'ð':
+			b.WriteByte('d')
+		case 'ß':
+			b.WriteString("ss")
+		case 'þ':
+			b.WriteString("th")
+		case 'æ':
+			b.WriteString("ae")
+		case 'œ':
+			b.WriteString("oe")
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // buildData serializes all sections into a byte slice for checksumming.

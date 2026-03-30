@@ -3,7 +3,8 @@
 > One number carries the entire semantic identity of a word — across every human language.
 
 [![Go](https://img.shields.io/badge/Go-1.24-blue?logo=go)](https://go.dev)
-[![License](https://img.shields.io/badge/license-EUPL_1.2-green)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Coverage](https://img.shields.io/badge/coverage-55.5%25-yellow)]()
 [![Tests](https://img.shields.io/badge/tests-18_packages-brightgreen)]()
 [![Languages](https://img.shields.io/badge/languages-70-orange)]()
 [![Words](https://img.shields.io/badge/words-4.37M-purple)]()
@@ -804,13 +805,4 @@ See [DATASETS.md](DATASETS.md) for dataset details and [BUILDING.md](BUILDING.md
 
 Copyright © Kaio Henrique Siqueira
 
-UMCS (Universal Morpheme Coordinate System) is licensed under the
-European Union Public Licence (EUPL) v. 1.2, with a modified Appendix
-that restricts the Compatible Licences list to the following:
-
-  - GNU Affero General Public License (AGPL) v. 3
-  - Open Software License (OSL) v. 2.1, v. 3.0
-
-This is the only difference from the standard EUPL v. 1.2.
-
-See [LICENSE](LICENSE) for the full licence text.
+UMCS is licensed under the [MIT License](LICENSE).

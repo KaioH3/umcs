@@ -27,8 +27,8 @@ func TestNormalize_LowercaseTrim(t *testing.T) {
 }
 
 func TestNormalize_Unicode(t *testing.T) {
-	if got := normalize("Café"); got != "café" {
-		t.Errorf("got %q, want %q", got, "café")
+	if got := normalize("Café"); got != "cafe" {
+		t.Errorf("got %q, want %q", got, "cafe")
 	}
 }
 

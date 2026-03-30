@@ -33,37 +33,60 @@ import (
 
 // Entry represents a word with sentiment annotations ready for CSV output.
 type Entry struct {
-	Word        string
-	Lang        string
-	Norm        string
-	Polarity    string // POSITIVE, NEGATIVE, NEUTRAL, AMBIGUOUS
-	Intensity   string // NONE, WEAK, MODERATE, STRONG, EXTREME
-	Arousal     string // LOW, MED, HIGH or empty
-	Dominance   string // LOW, MED, HIGH or empty
-	AoA         string // EARLY, MID, LATE, TECHNICAL or empty
+	Word         string
+	Lang         string
+	Norm         string
+	Polarity     string // POSITIVE, NEGATIVE, NEUTRAL, AMBIGUOUS
+	Intensity    string // NONE, WEAK, MODERATE, STRONG, EXTREME
+	Arousal      string // LOW, MED, HIGH or empty
+	Dominance    string // LOW, MED, HIGH or empty
+	AoA          string // EARLY, MID, LATE, TECHNICAL or empty
 	Concreteness string // 1 (concrete) or empty
-	POS         string
-	IPA         string
-	Syllables   int
-	FreqRank    int
-	Source      string // dataset that produced this entry
+	POS          string
+	IPA          string
+	Syllables    int
+	FreqRank     int
+	Source       string // dataset that produced this entry
 }
 
 // Result holds statistics from an import operation.
 type Result struct {
-	Total     int // total entries processed
-	New       int // entries not already in lexicon
-	Skipped   int // entries already present
-	Errors    int // parse errors
+	Total      int // total entries processed
+	New        int // entries not already in lexicon
+	Skipped    int // entries already present
+	Errors     int // parse errors
 	ByPolarity map[string]int
 }
 
-// normalize lowercases and trims a word for matching.
+// normalize lowercases, trims, and strips diacritics for matching.
 func normalize(s string) string {
 	s = strings.TrimSpace(s)
 	var b strings.Builder
 	for _, r := range s {
-		b.WriteRune(unicode.ToLower(r))
+		r = unicode.ToLower(r)
+		switch r {
+		case 'á', 'à', 'ã', 'â', 'ä', 'å', 'ā', 'ą', 'ă':
+			r = 'a'
+		case 'é', 'è', 'ê', 'ë', 'ē', 'ę', 'ė', 'ě':
+			r = 'e'
+		case 'í', 'ì', 'î', 'ï', 'ī', 'į', 'ı':
+			r = 'i'
+		case 'ó', 'ò', 'õ', 'ô', 'ö', 'ø', 'ō', 'ő', 'ǫ':
+			r = 'o'
+		case 'ú', 'ù', 'û', 'ü', 'ū', 'ů', 'ű', 'ų':
+			r = 'u'
+		case 'ý', 'ỳ', 'ŷ', 'ÿ':
+			r = 'y'
+		case 'ñ', 'ń':
+			r = 'n'
+		case 'ç', 'ć', 'č':
+			r = 'c'
+		case 'ş', 'ś', 'š':
+			r = 's'
+		case 'ž', 'ź', 'ż':
+			r = 'z'
+		}
+		b.WriteRune(r)
 	}
 	return b.String()
 }
@@ -529,13 +552,13 @@ func ImportNRCEmoLex(path string, targetLangs map[string]bool) ([]Entry, Result,
 		// Add English entry
 		if targetLangs == nil || targetLangs["EN"] {
 			e := Entry{
-				Word:     enWord,
-				Lang:     "EN",
-				Norm:     normalize(enWord),
-				Polarity: polarity,
+				Word:      enWord,
+				Lang:      "EN",
+				Norm:      normalize(enWord),
+				Polarity:  polarity,
 				Intensity: "MODERATE",
-				Arousal:  arousal,
-				Source:   "NRC-EmoLex",
+				Arousal:   arousal,
+				Source:    "NRC-EmoLex",
 			}
 			entries = append(entries, e)
 			res.Total++
@@ -1318,12 +1341,12 @@ func WriteCSV(path string, entries []Entry, nextWordID, defaultRootID int) error
 		w.Write([]string{
 			strconv.Itoa(id),
 			strconv.Itoa(defaultRootID), // placeholder root
-			"1",                          // variant
+			"1",                         // variant
 			e.Word, e.Lang, e.Norm,
 			e.Polarity, e.Intensity,
-			"", "",    // semantic_role, domain
-			freqStr,   // freq_rank
-			"0",       // flags
+			"", "", // semantic_role, domain
+			freqStr, // freq_rank
+			"0",     // flags
 			e.POS,
 			e.Arousal, e.Dominance,
 			e.AoA, e.Concreteness,
