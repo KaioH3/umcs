@@ -84,6 +84,8 @@ func main() {
 		cmdExportC(os.Args[2:])
 	case "stage-review":
 		cmdStageReview(os.Args[2:])
+	case "discover-remote":
+		cmdDiscoverRemote(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		usage()
@@ -339,13 +341,17 @@ func cmdBuild(args []string) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--roots":
-			rootsPath = args[i+1]; i++
+			rootsPath = args[i+1]
+			i++
 		case "--words":
-			wordsPath = args[i+1]; i++
+			wordsPath = args[i+1]
+			i++
 		case "--imported":
-			importedPath = args[i+1]; i++
+			importedPath = args[i+1]
+			i++
 		case "--out":
-			outPath = args[i+1]; i++
+			outPath = args[i+1]
+			i++
 		}
 	}
 
@@ -414,7 +420,8 @@ func cmdLookup(args []string) {
 	lexPath := defaultLexicon
 	for i := 1; i < len(args); i++ {
 		if args[i] == "--lexicon" {
-			lexPath = args[i+1]; i++
+			lexPath = args[i+1]
+			i++
 		}
 	}
 
@@ -549,7 +556,8 @@ func cmdStats(args []string) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--lexicon":
-			lexPath = args[i+1]; i++
+			lexPath = args[i+1]
+			i++
 		case "--productive":
 			productive = true
 		}
@@ -691,9 +699,11 @@ func cmdServe(args []string) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--port":
-			port = args[i+1]; i++
+			port = args[i+1]
+			i++
 		case "--lexicon":
-			lexPath = args[i+1]; i++
+			lexPath = args[i+1]
+			i++
 		}
 	}
 	lex := loadLex(lexPath)
@@ -745,9 +755,11 @@ func cmdDiscover(args []string) {
 		case "--expand":
 			expand = true
 		case "--seed":
-			seedWords = args[i+1]; i++
+			seedWords = args[i+1]
+			i++
 		case "--lang":
-			langs = args[i+1]; i++
+			langs = args[i+1]
+			i++
 		case "--depth":
 			if n, err := strconv.Atoi(args[i+1]); err == nil {
 				depth = n
@@ -772,11 +784,14 @@ func cmdDiscover(args []string) {
 				i++
 			}
 		case "--out":
-			outDir = args[i+1]; i++
+			outDir = args[i+1]
+			i++
 		case "--roots":
-			rootsPath = args[i+1]; i++
+			rootsPath = args[i+1]
+			i++
 		case "--words":
-			wordsPath = args[i+1]; i++
+			wordsPath = args[i+1]
+			i++
 		case "--verbose":
 			verbose = true
 		}
@@ -887,6 +902,44 @@ func cmdDiscover(args []string) {
 	}
 }
 
+func cmdDiscoverRemote(args []string) {
+	words := []string{}
+	langs := "EN,PT,ES"
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--lang":
+			langs = args[i+1]
+			i++
+		default:
+			words = append(words, args[i])
+		}
+	}
+
+	apiKey := infer.GetAPIKey()
+	if apiKey == "" {
+		fatalf("GROQ_API_KEY not set. Create .env file with GROQ_API_KEY=your_key")
+	}
+
+	client := infer.NewGroqClient(apiKey)
+
+	langList := strings.Split(langs, ",")
+	fmt.Printf("Inferring etymology for %d words in %s using Groq...\n", len(words), langs)
+
+	for _, word := range words {
+		for _, lang := range langList {
+			result, err := client.InferEtymology(word, lang)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error for %s (%s): %v\n", word, lang, err)
+				continue
+			}
+			fmt.Printf("%s (%s): root=%s origin=%s meaning=%s\n",
+				word, lang, result.Root, result.Origin, result.MeaningEN)
+		}
+	}
+	fmt.Println("Done! (inference only - not writing to lexicon yet)")
+}
+
 // --- import ---
 
 func cmdImport(args []string) {
@@ -904,9 +957,11 @@ func cmdImport(args []string) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--dump":
-			dumpPath = args[i+1]; i++
+			dumpPath = args[i+1]
+			i++
 		case "--lang":
-			langs = args[i+1]; i++
+			langs = args[i+1]
+			i++
 		case "--limit":
 			if n, err := strconv.Atoi(args[i+1]); err == nil {
 				limit = n
@@ -915,11 +970,14 @@ func cmdImport(args []string) {
 		case "--dry-run":
 			dryRun = true
 		case "--out":
-			outDir = args[i+1]; i++
+			outDir = args[i+1]
+			i++
 		case "--roots":
-			rootsPath = args[i+1]; i++
+			rootsPath = args[i+1]
+			i++
 		case "--words":
-			wordsPath = args[i+1]; i++
+			wordsPath = args[i+1]
+			i++
 		case "--verbose":
 			verbose = true
 		case "--batch":
@@ -1515,8 +1573,8 @@ func cmdStageReview(args []string) {
 
 	type candidate struct {
 		word, lang, polarity, intensity, role, source, definition string
-		rootID                                                     uint32
-		confidence                                                 float64
+		rootID                                                    uint32
+		confidence                                                float64
 	}
 	var candidates []candidate
 	for {

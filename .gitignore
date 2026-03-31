@@ -43,3 +43,7 @@ vocab.gob
 showcase
 fusedimport
 .story.md
+
+# Environment
+.env
+.env.local

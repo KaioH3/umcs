@@ -26,13 +26,13 @@ type HateResult struct {
 }
 
 var (
-	racismPatterns = regexp.MustCompile(`(?i)(\bnazi\b|\bfascist\b|\bwhite power\b|\brace\b.*inferior|\bethnic\b.*cleansing|\bapartheid\b|\bsupremac(y|ist)\b|\banti-.*race\b|\bracial\b.*hate|\bimmigrant\b.*(bad|wrong|invad|steal)|\brefugee\b.*(bad|wrong|invad)|\basylum\b.*(seek|migr))`)
+	racismPatterns = regexp.MustCompile(`(?i)(\bnazi\b|\bfascist\b|\bwhite power\b|\brace\b.*inferior|\bethnic\b.*cleansing|\bapartheid\b|\bsupremac(y|ist)\b|\banti-.*race\b|\bracial\b.*hate|\bimmigrant\b.*(bad|wrong|invad|steal)|\brefugee\b.*(bad|wrong|invad)|\basylum\b.*(seek|migr)|\bnigger\b|\bnigga\b|\bnegro\b.*(stupid|idiot|dumb)|black\b.*(monkey|ape))`)
 
 	portugueseRacismPatterns = regexp.MustCompile(`(?i)(\bpreto\b.*(burro|estupido|lixo|macaco|idiota|vagabundo|feio|desgraçado|merda|odiar|nojo)|macaco\b.*(preto|negro|branco)|\bnigga\b|\bnegreiro\b|\bnegão\b|\bnegrinho\b|racismo\b|racista\b|preto.*macaco|macaco.*preto|preto.*burro|preto.*idiota|preto.*desgraçado)`)
 
 	portugueseSexismPatterns = regexp.MustCompile(`(?i)(\bviado\b|\bbicha\b|\bveado\b|\bbuneca\b|\bsapata\b|\bsapatão\b|\bhomosexual\b|\btravesti\b|\btrans\b.*(doente|errado|surgery)|sapatão\b.*(doente|pecado)|viado\b.*(nojo|doente|pecado)|bicha\b.*(nojo|doente)|bunda\b.*(sua|dar)|lolita\b|\bpiroca\b|\brola\b|\bporra\b.*(mulher|gay)|mulher\b.*(programa|meretriz|puta|vagabunda|entregue)|puta\b|\bputo\b|\bvadia\b|\bpiranha\b|\bgarota\b.*(programa|pega)|fdp\b|\bfoder\b|\bcaralho\b)`)
 
-	portugueseAbleismPatterns = regexp.MustCompile(`(?i)(\bretardado\b|\bidiota\b|\bburro\b|\bestupido\b|\bpalhaço\b|\bdesgraçado\b|\btrouxa\b|\botario\b|\botário\b|\bmedíocre\b|\bfraco\b.*(mental|inteligente)|doente\b.*(mental|psico)|louco\b|\bcrazy\b|\btarado\b|\bpervertido\b|\bordinário\b|\bvagabundo\b|\bnojento\b|\bimundo\b|\bfedido\b|\bfdp\b|\bfilha da puta\b|\bfilho da puta\b|\bcu\b.*(de|mao)|viado\b|\bveado\b|\bbicha\b)`)
+	portugueseAbleismPatterns = regexp.MustCompile(`(?i)(\bretardado\b|\bidiota\b|\bburro\b|\bestupido\b|\bpalhaço\b|\bdesgraçado\b|\btrouxa\b|\botario\b|\botário\b|\bmedíocre\b|\bfraco\b.*(mental|inteligente)|doente\b.*(mental|psico)|louco\b|\bcrazy\b|\btarado\b|\bpervertido\b|\bordinário\b|\bvagabundo\b|\bnojento\b|\bimundo\b|\bfedido\b|\bfdp\b|\bfilha da puta\b|\bfilho da puta\b|\bcu\b.*(de|mao)|viado\b|\bveado\b|\bbicha\b|\bdesgraçado\b|\bordinário\b)`)
 
 	spanishRacismPatterns = regexp.MustCompile(`(?i)(\bnegro\b.*(estúpido|idiota|burro|loco)|maricón\b|\bmono\b.*(negro|persona)|indio\b.*(sucio|primitivo)|gordo\b.*(estúpido|idiota)|racismo\b|racista\b|\bcholo\b)`)
 
