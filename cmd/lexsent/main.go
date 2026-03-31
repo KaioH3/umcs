@@ -905,12 +905,19 @@ func cmdDiscover(args []string) {
 func cmdDiscoverRemote(args []string) {
 	words := []string{}
 	langs := "EN,PT,ES"
+	outFile := "data/inferred_words.csv"
+	appendMode := false
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--lang":
 			langs = args[i+1]
 			i++
+		case "--out":
+			outFile = args[i+1]
+			i++
+		case "--append":
+			appendMode = true
 		default:
 			words = append(words, args[i])
 		}
@@ -926,6 +933,18 @@ func cmdDiscoverRemote(args []string) {
 	langList := strings.Split(langs, ",")
 	fmt.Printf("Inferring etymology for %d words in %s using Groq...\n", len(words), langs)
 
+	out, err := os.OpenFile(outFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		fatalf("open output file: %v", err)
+	}
+	defer out.Close()
+
+	if !appendMode {
+		out.Truncate(0)
+		out.Seek(0, 0)
+		fmt.Fprintf(out, "word,lang,root,origin,meaning_en\n")
+	}
+
 	for _, word := range words {
 		for _, lang := range langList {
 			result, err := client.InferEtymology(word, lang)
@@ -933,11 +952,12 @@ func cmdDiscoverRemote(args []string) {
 				fmt.Fprintf(os.Stderr, "Error for %s (%s): %v\n", word, lang, err)
 				continue
 			}
+			fmt.Fprintf(out, "%s,%s,%s,%s,%s\n", word, lang, result.Root, result.Origin, result.MeaningEN)
 			fmt.Printf("%s (%s): root=%s origin=%s meaning=%s\n",
 				word, lang, result.Root, result.Origin, result.MeaningEN)
 		}
 	}
-	fmt.Println("Done! (inference only - not writing to lexicon yet)")
+	fmt.Printf("Done! Results written to %s\n", outFile)
 }
 
 // --- import ---
