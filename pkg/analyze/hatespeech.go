@@ -28,6 +28,18 @@ type HateResult struct {
 var (
 	racismPatterns = regexp.MustCompile(`(?i)(\bnazi\b|\bfascist\b|\bwhite power\b|\brace\b.*inferior|\bethnic\b.*cleansing|\bapartheid\b|\bsupremac(y|ist)\b|\banti-.*race\b|\bracial\b.*hate|\bimmigrant\b.*(bad|wrong|invad|steal)|\brefugee\b.*(bad|wrong|invad)|\basylum\b.*(seek|migr))`)
 
+	portugueseRacismPatterns = regexp.MustCompile(`(?i)(\bpreto\b.*(burro|estupido|lixo|macaco|idiota|vagabundo|feio|desgraçado|merda|odiar|nojo)|macaco\b.*(preto|negro|branco)|\bnigga\b|\bnegreiro\b|\bnegão\b|\bnegrinho\b|racismo\b|racista\b|preto.*macaco|macaco.*preto|preto.*burro|preto.*idiota|preto.*desgraçado)`)
+
+	portugueseSexismPatterns = regexp.MustCompile(`(?i)(\bviado\b|\bbicha\b|\bveado\b|\bbuneca\b|\bsapata\b|\bsapatão\b|\bhomosexual\b|\btravesti\b|\btrans\b.*(doente|errado|surgery)|sapatão\b.*(doente|pecado)|viado\b.*(nojo|doente|pecado)|bicha\b.*(nojo|doente)|bunda\b.*(sua|dar)|lolita\b|\bpiroca\b|\brola\b|\bporra\b.*(mulher|gay)|mulher\b.*(programa|meretriz|puta|vagabunda|entregue)|puta\b|\bputo\b|\bvadia\b|\bpiranha\b|\bgarota\b.*(programa|pega)|fdp\b|\bfoder\b|\bcaralho\b)`)
+
+	portugueseAbleismPatterns = regexp.MustCompile(`(?i)(\bretardado\b|\bidiota\b|\bburro\b|\bestupido\b|\bpalhaço\b|\bdesgraçado\b|\btrouxa\b|\botario\b|\botário\b|\bmedíocre\b|\bfraco\b.*(mental|inteligente)|doente\b.*(mental|psico)|louco\b|\bcrazy\b|\btarado\b|\bpervertido\b|\bordinário\b|\bvagabundo\b|\bnojento\b|\bimundo\b|\bfedido\b|\bfdp\b|\bfilha da puta\b|\bfilho da puta\b|\bcu\b.*(de|mao)|viado\b|\bveado\b|\bbicha\b)`)
+
+	spanishRacismPatterns = regexp.MustCompile(`(?i)(\bnegro\b.*(estúpido|idiota|burro|loco)|maricón\b|\bmono\b.*(negro|persona)|indio\b.*(sucio|primitivo)|gordo\b.*(estúpido|idiota)|racismo\b|racista\b|\bcholo\b)`)
+
+	spanishSexismPatterns = regexp.MustCompile(`(?i)(\bmarica\b|\bmaricón\b|\bbimbo\b|\bzorra\b|\bputa\b|\bcochina\b|\bfulana\b|\btonta\b|\bempleada\b.*(sexual|obediente)|mujer\b.*(casa|cocina|obedecer)|homosexual\b|\b lésbic[oa]\b)`)
+
+	spanishAbleismPatterns = regexp.MustCompile(`(?i)(\btonto\b|\bidiota\b|\bestúpido\b|\bburro\b|\bloco\b|\bloco\b|\bchiflado\b|\bdemente\b|\bretrasado\b|\bfrustrado\b|\bsubnormal\b)`)
+
 	sexismPatterns = regexp.MustCompile(`(?i)(\bwoman\b.*(should|need|can'?t).*(cook|clean|submit|obey|man)|\bbitch\b|\bwhore\b|\bslut\b|\bharass\b|\b(man|men)\b.*superior|\bfeminist\b.*(hate|kill|die)|\bwomen\b.*(belong|home|submit)|\bsexist\b|\bpatriarchy\b.*(bad|hate))`)
 
 	homophobiaPatterns = regexp.MustCompile(`(?i)(\bgay\b.*(bad|wrong|disease|sin|hell)|\bhomosexual\b.*(bad|sin|abnormal)|\bqueer\b.*(bad|hate)|\b(lgbt|bisexual|transgender).* (bad|wrong|sin)|\bpride\b.*(shame|disgust)|\bsodomite\b|\bfaggot\b|\bdyke\b)`)
@@ -48,12 +60,12 @@ func DetectHateSpeech(text string) *HateResult {
 	categories := []HateCategory{}
 	score := 0.0
 
-	if racismPatterns.MatchString(lower) {
+	if racismPatterns.MatchString(lower) || portugueseRacismPatterns.MatchString(lower) || spanishRacismPatterns.MatchString(lower) {
 		categories = append(categories, HateRacism)
 		score += 0.8
 	}
 
-	if sexismPatterns.MatchString(lower) {
+	if sexismPatterns.MatchString(lower) || portugueseSexismPatterns.MatchString(lower) || spanishSexismPatterns.MatchString(lower) {
 		categories = append(categories, HateSexism)
 		score += 0.75
 	}
@@ -73,7 +85,7 @@ func DetectHateSpeech(text string) *HateResult {
 		score += 0.7
 	}
 
-	if ableismPatterns.MatchString(lower) {
+	if ableismPatterns.MatchString(lower) || portugueseAbleismPatterns.MatchString(lower) || spanishAbleismPatterns.MatchString(lower) {
 		categories = append(categories, HateAbleism)
 		score += 0.65
 	}

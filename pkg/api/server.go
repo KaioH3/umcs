@@ -1070,12 +1070,14 @@ func (s *Server) handleHate(w http.ResponseWriter, r *http.Request) {
 
 	text := r.URL.Query().Get("text")
 	if text == "" && r.Method == http.MethodPost {
-		var err error
-		text, err = readBody(r)
-		if err != nil {
-			httpErr(w, "read body: "+err.Error(), http.StatusBadRequest)
+		var body struct {
+			Text string `json:"text"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			httpErr(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		text = body.Text
 	}
 	if text == "" {
 		httpErr(w, "missing text", 400)
