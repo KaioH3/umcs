@@ -10,6 +10,12 @@ data/imported_words.csv
 data/external/
 
 # Build artifacts
+umcs
+lexsent
+import-new
+fusedimport
+test_etymwn
+showcase
 *.so
 *.h
 *.out
@@ -37,12 +43,33 @@ vendor/
 
 # LinkedIn strategy (personal)
 LINKEDIN_GUIDE.md
+LINKEDIN_POST*.md
 BENCHMARK.md
+LLM_INTEGRATION.md
+TOKEN64_VS_LLM.md
 resume.txt
 vocab.gob
 showcase
 fusedimport
 .story.md
+
+# Scripts
+benchmark_quick.sh
+run_discovery_offline.sh
+showcase.sh
+showcase_api.sh
+
+# Generated data
+data/inferred_words.csv
+data/inferred_words_offline.csv
+data/.discover_checkpoint.json
+
+# Generated Go files
+pkg/infer/etymwn.go
+
+# Test binaries / directories
+cmd/test_etymwn/
+test_etymwn
 
 # Environment
 .env
