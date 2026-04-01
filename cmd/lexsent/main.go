@@ -86,6 +86,8 @@ func main() {
 		cmdStageReview(os.Args[2:])
 	case "discover-remote":
 		cmdDiscoverRemote(os.Args[2:])
+	case "discover-offline":
+		cmdDiscoverOffline(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		usage()
@@ -110,7 +112,7 @@ func cmdDemo(args []string) {
 	fmt.Println(sep)
 	fmt.Println()
 
-	lex, err := lexdb.Load(lexPath)
+	lex, err := lexdb.LoadGlobal(lexPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load lexicon: %v\n  → run 'lexsent build' first\n", err)
 		os.Exit(1)
@@ -714,7 +716,7 @@ func cmdServe(args []string) {
 // --- helpers ---
 
 func loadLex(path string) *lexdb.Lexicon {
-	lex, err := lexdb.Load(path)
+	lex, err := lexdb.LoadGlobal(path)
 	if err != nil {
 		fatalf("load lexicon: %v", err)
 	}
@@ -908,6 +910,32 @@ func cmdDiscoverRemote(args []string) {
 	outFile := "data/inferred_words.csv"
 	appendMode := false
 
+	fmt.Println("╔═══════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║  UMCS Discover Remote - Etymology via Groq API                 ║")
+	fmt.Println("╠═══════════════════════════════════════════════════════════════════╣")
+	fmt.Println("║  Uses: Groq LLM API (requires GROQ_API_KEY in .env)             ║")
+	fmt.Println("║  More accurate, handles complex etymologies                    ║")
+	fmt.Println("║  Output: word → root → origin language → meaning                ║")
+	fmt.Println("╚═══════════════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	if len(args) == 0 {
+		fmt.Println("Usage: lexsent discover-remote <word1> [word2] ... [wordN]")
+		fmt.Println("       lexsent discover-remote --lang PT,EN,ES word1 word2")
+		fmt.Println()
+		fmt.Println("Options:")
+		fmt.Println("  --lang LANG    Languages (comma-separated, default: PT,EN,ES)")
+		fmt.Println("  --out FILE    Output CSV file (default: data/inferred_words.csv)")
+		fmt.Println("  --append     Append to output file instead of overwriting")
+		fmt.Println()
+		fmt.Println("Examples:")
+		fmt.Println("  lexsent discover-remote amor beauty house")
+		fmt.Println("  lexsent discover-remote --lang PT,ES,IT imprimir homem")
+		fmt.Println()
+		fmt.Println("Note: Requires GROQ_API_KEY in .env file")
+		os.Exit(0)
+	}
+
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--lang":
@@ -955,6 +983,105 @@ func cmdDiscoverRemote(args []string) {
 			fmt.Fprintf(out, "%s,%s,%s,%s,%s\n", word, lang, result.Root, result.Origin, result.MeaningEN)
 			fmt.Printf("%s (%s): root=%s origin=%s meaning=%s\n",
 				word, lang, result.Root, result.Origin, result.MeaningEN)
+		}
+	}
+	fmt.Printf("Done! Results written to %s\n", outFile)
+}
+
+func cmdDiscoverOffline(args []string) {
+	words := []string{}
+	langs := "EN,PT,ES"
+	outFile := "data/inferred_words_offline.csv"
+	appendMode := false
+
+	fmt.Println("╔═══════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║  UMCS Discover Offline - Etymology from local database             ║")
+	fmt.Println("╠═══════════════════════════════════════════════════════════════════╣")
+	fmt.Println("║  Source: EtymWN (etymwn.zip) - 5.8M etymology entries              ║")
+	fmt.Println("║  No API, No GPU, No Internet - 100% offline                        ║")
+	fmt.Println("║  Output: word → root → origin language                             ║")
+	fmt.Println("╚═══════════════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	if len(args) == 0 {
+		fmt.Println("Usage: lexsent discover-offline <word1> [word2] ... [wordN]")
+		fmt.Println("       lexsent discover-offline --lang PT,EN,ES word1 word2")
+		fmt.Println()
+		fmt.Println("Options:")
+		fmt.Println("  --lang LANG    Languages (comma-separated, default: PT,EN,ES)")
+		fmt.Println("  --out FILE     Output CSV file (default: data/inferred_words_offline.csv)")
+		fmt.Println("  --append      Append to output file instead of overwriting")
+		fmt.Println()
+		fmt.Println("Examples:")
+		fmt.Println("  lexsent discover-offline amor beauty house")
+		fmt.Println("  lexsent discover-offline --lang PT,ES,IT imprimir homem")
+		fmt.Println("  lexsent discover-offline --out my_etymology.csv word1 word2")
+		os.Exit(0)
+	}
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--lang":
+			langs = args[i+1]
+			i++
+		case "--out":
+			outFile = args[i+1]
+			i++
+		case "--append":
+			appendMode = true
+		default:
+			words = append(words, args[i])
+		}
+	}
+
+	langList := strings.Split(langs, ",")
+	db, err := infer.GetEtymDB("data/external/etymwn.zip")
+	if err != nil {
+		fatalf("load EtymWN: %v", err)
+	}
+
+	fmt.Printf("Looking up %d words in %s using offline EtymWN...\n", len(words), langs)
+
+	out, err := os.OpenFile(outFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		fatalf("open output file: %v", err)
+	}
+	defer out.Close()
+
+	if !appendMode {
+		out.Truncate(0)
+		out.Seek(0, 0)
+		fmt.Fprintf(out, "word,lang,root,origin,meaning_en\n")
+	}
+
+	originMap := map[string]string{
+		"lat": "LATIN", "grc": "GREEK", "eng": "ENGLISH",
+		"por": "PORTUGUESE", "spa": "SPANISH", "ita": "ITALIAN",
+		"deu": "GERMAN", "fra": "FRENCH", "ang": "OLD ENGLISH",
+		"enm": "MIDDLE ENGLISH", "fro": "OLD FRENCH", "goh": "OLD HIGH GERMAN",
+	}
+
+	for _, word := range words {
+		for _, lang := range langList {
+			etym := db.LookupEtymology(word)
+
+			var rootStr, origin, meaning string
+			if etym != nil {
+				rootStr = etym.Root
+				origin = etym.Origin
+				if origLang, ok := originMap[strings.ToLower(etym.Origin)]; ok {
+					origin = origLang
+				}
+				meaning = "via EtymWN"
+			} else {
+				rootStr = word
+				origin = "UNKNOWN"
+				meaning = "not found in EtymWN"
+			}
+
+			fmt.Fprintf(out, "%s,%s,%s,%s,%s\n", word, lang, rootStr, origin, meaning)
+			fmt.Printf("%s (%s): root=%s origin=%s meaning=%s\n",
+				word, lang, rootStr, origin, meaning)
 		}
 	}
 	fmt.Printf("Done! Results written to %s\n", outFile)
@@ -1123,7 +1250,7 @@ func cmdTrain(args []string) {
 
 	_ = dataPath // future: load from JSONL
 
-	lex, err := lexdb.Load(lexPath)
+	lex, err := lexdb.LoadGlobal(lexPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load lexicon: %v\n", err)
 		os.Exit(1)
@@ -1222,7 +1349,7 @@ func cmdPredict(args []string) {
 		}
 	}
 
-	lex, err := lexdb.Load(lexPath)
+	lex, err := lexdb.LoadGlobal(lexPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load lexicon: %v\n", err)
 		os.Exit(1)
@@ -1391,7 +1518,7 @@ func cmdEvolve(args []string) {
 		}
 	}
 
-	lex, err := lexdb.Load(lexPath)
+	lex, err := lexdb.LoadGlobal(lexPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load lexicon: %v\n", err)
 		os.Exit(1)
@@ -1790,22 +1917,24 @@ func usage() {
 	fmt.Println(`lexsent — Universal Morpheme Coordinate System
 
 Commands:
-  build    [--roots PATH] [--words PATH] [--out PATH]
-  demo     [--lexicon PATH]
-  lookup   <word>
-  cognates <word>
-  etymo    <word>
-  analyze  <text>
-  tokenize <text>
-  stats    [--productive]
-  serve    [--port PORT]
-  discover [--expand | --seed word1,word2] [--lang PT,EN,...] [--depth N] [--limit N] [--dry-run] [--reset] [--verbose]
-  import   --dump PATH.xml.bz2 [--lang PT,EN,...] [--limit N] [--dry-run] [--verbose] [--batch N]
+  build            [--roots PATH] [--words PATH] [--out PATH]
+  demo             [--lexicon PATH]
+  lookup           <word>
+  cognates         <word>
+  etymo            <word>
+  analyze          <text>
+  tokenize         <text>
+  stats            [--productive]
+  serve            [--port PORT]
+  discover         [--expand | --seed word1,word2] [--lang PT,EN,...] [--depth N] [--limit N] [--dry-run] [--reset] [--verbose]
+  discover-remote <word1> [word2]...  (requires GROQ_API_KEY)
+  discover-offline <word1> [word2]... (uses local EtymWN, no API)
+  import           --dump PATH.xml.bz2 [--lang PT,EN,...] [--limit N] [--dry-run] [--verbose] [--batch N]
 
 ML Commands:
-  train    [--auto] [--lexicon PATH] [--out models/classifier.bin] [--val-split 0.2] [--epochs 50]
-  predict  <word> [<lang>] [--model models/classifier.bin] [--lexicon PATH]
-  feedback [--ok | --label LABEL] [--model PATH]
-  evolve   [--generations 50] [--pop 32] [--model PATH] [--lexicon PATH]
-  export-c [--out DIR] [--header DIR]`)
+  train            [--auto] [--lexicon PATH] [--out models/classifier.bin] [--val-split 0.2] [--epochs 50]
+  predict          <word> [<lang>] [--model models/classifier.bin] [--lexicon PATH]
+  feedback         [--ok | --label LABEL] [--model PATH]
+  evolve           [--generations 50] [--pop 32] [--model PATH] [--lexicon PATH]
+  export-c         [--out DIR] [--header DIR]`)
 }

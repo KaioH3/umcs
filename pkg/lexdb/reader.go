@@ -6,17 +6,50 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
+	"syscall"
 	"unicode"
 
 	"github.com/kak/umcs/pkg/morpheme"
 )
+
+// Global lexicon cache - loaded once, reused across all commands
+var (
+	lexiconCache     *Lexicon
+	lexiconCachePath string
+	lexiconOnce      sync.Once
+	lexiconErr       error
+)
+
+// LoadGlobal returns a cached lexicon, loading it once on first call.
+// This avoids re-loading the 250MB file for every command.
+func LoadGlobal(path string) (*Lexicon, error) {
+	lexiconOnce.Do(func() {
+		lexiconCachePath = path
+		lexiconCache, lexiconErr = Load(path)
+	})
+	return lexiconCache, lexiconErr
+}
+
+// ResetGlobalCache clears the global cache, useful for testing or switching lexicons
+func ResetGlobalCache() {
+	lexiconOnce = sync.Once{}
+	lexiconCache = nil
+	lexiconCachePath = ""
+	lexiconErr = nil
+}
+
+// GetCachedLexicon returns the cached lexicon if already loaded
+func GetCachedLexicon() *Lexicon {
+	return lexiconCache
+}
 
 // Lexicon holds the fully loaded lexicon in memory.
 // After Load, all lookups are O(1) (word) or O(log N) (root by ID).
 type Lexicon struct {
 	Roots     []RootRecord
 	Words     []WordRecord
-	Heap      []byte   // raw string heap
+	Heap      []byte         // raw string heap
 	wordIndex map[string]int // normalized form → index in Words
 	Stats     LexiconStats
 }
@@ -32,8 +65,15 @@ type LexiconStats struct {
 }
 
 // Load reads a .umcs file into memory and builds the lookup index.
-// The entire file is read at once; for very large lexicons (>100MB) use LoadMmap.
+// Uses memory-mapped I/O for fast loading of large files (>100MB).
 func Load(path string) (*Lexicon, error) {
+	return LoadMmap(path)
+}
+
+// LoadMmap loads the lexicon using memory-mapped file I/O.
+// This is much faster for large files as it uses virtual memory
+// instead of copying data into user space.
+func LoadMmap(path string) (*Lexicon, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
@@ -44,14 +84,32 @@ func Load(path string) (*Lexicon, error) {
 	if err != nil {
 		return nil, err
 	}
+	size := fi.Size()
 
-	// Read entire file
-	data := make([]byte, fi.Size())
-	if _, err = f.Read(data); err != nil {
-		return nil, fmt.Errorf("read %s: %w", path, err)
+	// Memory map the file - much faster than Read for large files
+	data, err := mmap(f, int(size))
+	if err != nil {
+		return nil, fmt.Errorf("mmap %s: %w", path, err)
 	}
 
-	return parse(data, fi.Size())
+	return parse(data, size)
+}
+
+// mmap memory-maps a file for reading. The mapping is automatically
+// released when the process exits.
+func mmap(f *os.File, size int) ([]byte, error) {
+	// Hint to the kernel that we'll read sequentially
+	hint := syscall.MADV_SEQUENTIAL
+
+	// Map the entire file - returns []byte directly
+	data, err := syscall.Mmap(int(f.Fd()), 0, size, syscall.PROT_READ, hint)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a properly typed slice without copying
+	b := data[:size]
+	return b, nil
 }
 
 func parse(data []byte, fileSize int64) (*Lexicon, error) {
@@ -119,19 +177,19 @@ func parse(data []byte, fileSize int64) (*Lexicon, error) {
 	roff := int(rootTableOffset)
 	for i := range roots {
 		r := RootRecord{
-			RootID:       ByteOrder.Uint32(data[roff:]),
-			WordCount:    ByteOrder.Uint32(data[roff+4:]),
-			FirstWordIdx: ByteOrder.Uint32(data[roff+8:]),
-			NameOffset:   ByteOrder.Uint32(data[roff+12:]),
-			LangCoverage: ByteOrder.Uint32(data[roff+16:]),
-			ParentRootID: ByteOrder.Uint32(data[roff+20:]),
-			OriginOffset: ByteOrder.Uint32(data[roff+24:]),
+			RootID:        ByteOrder.Uint32(data[roff:]),
+			WordCount:     ByteOrder.Uint32(data[roff+4:]),
+			FirstWordIdx:  ByteOrder.Uint32(data[roff+8:]),
+			NameOffset:    ByteOrder.Uint32(data[roff+12:]),
+			LangCoverage:  ByteOrder.Uint32(data[roff+16:]),
+			ParentRootID:  ByteOrder.Uint32(data[roff+20:]),
+			OriginOffset:  ByteOrder.Uint32(data[roff+24:]),
 			MeaningOffset: ByteOrder.Uint32(data[roff+28:]),
 		}
 		if version >= 2 {
 			r.HypernymRootID = ByteOrder.Uint32(data[roff+32:])
-			r.AntonymRootID  = ByteOrder.Uint32(data[roff+36:])
-			r.SynonymRootID  = ByteOrder.Uint32(data[roff+40:])
+			r.AntonymRootID = ByteOrder.Uint32(data[roff+36:])
+			r.SynonymRootID = ByteOrder.Uint32(data[roff+40:])
 		}
 		roots[i] = r
 		roff += int(rootRecSize)
